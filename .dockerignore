@@ -3,6 +3,6 @@
 data
 *.log
 node_modules
-koyeb-state.png
+scripts/chunks
 scripts/deploy-render.js
 scripts/gh-device.js
