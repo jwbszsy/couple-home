@@ -10,6 +10,7 @@ import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.IBinder
+import android.content.pm.ServiceInfo
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import kotlinx.coroutines.CoroutineScope
@@ -40,7 +41,7 @@ class ForegroundAppService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        ServiceCompat.startForeground(this, 1, buildNotification("正在分享我的实时状态…"))
+        ServiceCompat.startForeground(this, 1, buildNotification("正在分享我的实时状态…"), ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         job?.cancel()
         job = scope.launch {
             while (isActive) {
@@ -142,3 +143,4 @@ class ForegroundAppService : Service() {
             context.getSharedPreferences("couple", Context.MODE_PRIVATE)
     }
 }
+
