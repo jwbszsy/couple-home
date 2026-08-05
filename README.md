@@ -168,3 +168,5 @@ Dockerfile              一键部署
 > Railway 部署：修复 railway.json BOM 后重新部署验证。
 
 > 自动部署已启用验证。
+
+> 持久化卷挂载验证。
