@@ -1,18 +1,10 @@
-﻿# 我们的小屋 —— Suga / Docker Compose 部署配置
-# 由仓库根目录 Dockerfile 构建，数据持久化到 data 卷（挂载 /app/data）
-services:
+﻿services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: .
     environment:
       - PORT=3000
       - DATA_DIR=/app/data
-    ports:
-      - "3000:3000"
     volumes:
       - data:/app/data
-    restart: unless-stopped
-
 volumes:
   data:
