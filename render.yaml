@@ -1,0 +1,17 @@
+﻿# Render Blueprint —— 在 https://render.com 连接 GitHub 仓库后自动生效
+# 免费额度：每月 750 小时，闲置 15 分钟会休眠（再次访问自动唤醒）。
+services:
+  - type: web
+    name: couple-home
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      # 如需数据持久化（付费磁盘），把下面两行打开并挂载磁盘：
+      # - key: DATA_DIR
+      #   value: /var/data

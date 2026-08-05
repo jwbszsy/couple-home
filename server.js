@@ -14,7 +14,7 @@ const crypto = require('crypto');
 
 const ROOT = __dirname;
 const PUBLIC_DIR = path.join(ROOT, 'public');
-const DATA_DIR = path.join(ROOT, 'data');
+const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(ROOT, 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -387,8 +387,10 @@ function serveStatic(req, res, p) {
   });
 }
 
+try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) { /* ignore */ }
 server.listen(PORT, HOST, () => {
   console.log('❤ 我们的小屋服务已启动: http://localhost:' + PORT);
   console.log('   数据目录: ' + DATA_DIR);
 });
+
 
