@@ -1,0 +1,13 @@
+﻿{
+  "name": "couple-home",
+  "version": "0.1.0",
+  "private": true,
+  "description": "我们的小屋 —— 情侣专属实时互动小软件（零依赖 Node 服务端 + PWA 前端 + Android 伴侣端）",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "icons": "node scripts/gen-icons.js",
+    "test": "node scripts/smoke.js"
+  },
+  "engines": { "node": ">=18" }
+}

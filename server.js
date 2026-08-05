@@ -1,0 +1,394 @@
+﻿'use strict';
+
+/**
+ * 我们的小屋 —— 情侣专属实时互动小软件（服务端）
+ * 零第三方依赖：仅使用 Node.js 内置模块（http / fs / path / crypto）。
+ * 实时推送：SSE（Server-Sent Events）；数据持久化：data/db.json（原子写入）。
+ * 运行：node server.js  （默认 http://localhost:3000）
+ */
+
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+
+const ROOT = __dirname;
+const PUBLIC_DIR = path.join(ROOT, 'public');
+const DATA_DIR = path.join(ROOT, 'data');
+const DB_FILE = path.join(DATA_DIR, 'db.json');
+const PORT = Number(process.env.PORT || 3000);
+const HOST = process.env.HOST || '0.0.0.0';
+
+const MAX_JSON_BODY = 18 * 1024 * 1024;   // 单次请求体上限（头像/背景/图片/音乐 base64）
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;  // 单张图片 base64 上限
+const MAX_AUDIO_BYTES = 10 * 1024 * 1024; // 单首音乐 base64 上限
+const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 去掉易混淆字符
+
+// ---------------- 持久化 ----------------
+let db = { pairs: {} };
+try { db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8')); } catch (e) { /* 首次运行 */ }
+
+let saveQueued = false;
+function save() {
+  if (saveQueued) return;
+  saveQueued = true;
+  setImmediate(() => {
+    saveQueued = false;
+    try {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+      const tmp = DB_FILE + '.tmp';
+      fs.writeFileSync(tmp, JSON.stringify(db));
+      fs.renameSync(tmp, DB_FILE);
+    } catch (e) { console.error('[db] 保存失败:', e.message); }
+  });
+}
+
+// ---------------- 工具 ----------------
+function uid(prefix) { return prefix + '_' + crypto.randomBytes(6).toString('hex'); }
+function genCode(len) {
+  len = len || 8;
+  let s = '';
+  for (let i = 0; i < len; i++) s += CODE_ALPHABET[crypto.randomInt(CODE_ALPHABET.length)];
+  return s;
+}
+function todayStr() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function json(res, code, obj) {
+  const body = JSON.stringify(obj);
+  res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+  res.end(body);
+}
+function fail(res, code, msg) { json(res, code, { ok: false, error: msg }); }
+function ok(res, data) { json(res, 200, { ok: true, data }); }
+
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks = [];
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > MAX_JSON_BODY) { reject(new Error('请求体过大')); req.destroy(); return; }
+      chunks.push(c);
+    });
+    req.on('end', () => {
+      try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')); }
+      catch (e) { reject(new Error('JSON 解析失败')); }
+    });
+    req.on('error', reject);
+  });
+}
+
+function dataUrlBytes(dataUrl) {
+  const comma = String(dataUrl).indexOf(',');
+  const b64 = comma >= 0 ? String(dataUrl).slice(comma + 1) : String(dataUrl);
+  return Math.ceil(b64.length * 3 / 4);
+}
+function assertSize(dataUrl, maxBytes) {
+  if (dataUrlBytes(dataUrl) > maxBytes) {
+    throw new Error('文件过大（上限约 ' + Math.round(maxBytes / 1024 / 1024 * 10) / 10 + 'MB）');
+  }
+}
+
+// ---------------- SSE 实时推送 ----------------
+const clients = new Map(); // pairId -> Set<res>
+function subscribe(pairId, res) {
+  if (!clients.has(pairId)) clients.set(pairId, new Set());
+  clients.get(pairId).add(res);
+  res.on('close', () => {
+    const s = clients.get(pairId);
+    if (s) { s.delete(res); if (!s.size) clients.delete(pairId); }
+  });
+}
+function broadcast(pairId) {
+  const pair = db.pairs[pairId];
+  if (!pair) return;
+  const payload = 'data: ' + JSON.stringify(pair) + '\n\n';
+  const set = clients.get(pairId);
+  if (!set) return;
+  for (const res of set) { try { res.write(payload); } catch (e) { /* 忽略 */ } }
+}
+setInterval(() => {
+  for (const set of clients.values()) for (const res of set) { try { res.write(': ping\n\n'); } catch (e) { /* 忽略 */ } }
+}, 25000).unref();
+
+// ---------------- 业务逻辑 ----------------
+function getPair(pairId) { return db.pairs[pairId] || null; }
+function requirePairMember(pairId, memberId) {
+  const pair = getPair(pairId);
+  if (!pair) return { error: '小屋不存在' };
+  const member = pair.members[memberId];
+  if (!member) return { error: '成员校验失败，请重新配对' };
+  return { pair, member };
+}
+function newMember(pairId, nickname, role) {
+  const memberId = uid('m');
+  const member = {
+    id: memberId,
+    pairId,
+    nickname: String(nickname || '').trim().slice(0, 20) || '小可爱',
+    role: role === 'girl' ? 'girl' : 'boy',
+    avatar: null,
+    status: null,     // { type:'app'|'manual', name, packageName, ts }
+    todayNote: null,  // { date, text, updatedAt }
+    createdAt: Date.now()
+  };
+  db.pairs[pairId].members[memberId] = member;
+  return member;
+}
+function newPair(nickname, role) {
+  const pairId = uid('p');
+  const pair = {
+    id: pairId,
+    code: genCode(),
+    createdAt: Date.now(),
+    anniversary: todayStr(),
+    background: null,
+    members: {},
+    entries: [],      // { id, memberId, type:'mood'|'food', text, emoji, image, date, createdAt }
+    todos: [],        // { id, text, done, createdBy, createdAt, doneAt }
+    music: { tracks: [], nowPlaying: null } // tracks: { id, title, dataUrl, addedBy, addedAt }
+  };
+  db.pairs[pairId] = pair;
+  newMember(pairId, nickname, role);
+  return pair;
+}
+
+// ---------------- HTTP 服务 ----------------
+const server = http.createServer(async (req, res) => {
+  let pathname;
+  try { pathname = new URL(req.url, 'http://localhost').pathname; }
+  catch (e) { return fail(res, 400, '无效请求'); }
+
+  // SSE 事件流
+  if (pathname.startsWith('/api/events/')) {
+    const parts = pathname.split('/');
+    const pid = parts[3], mid = parts[4];
+    const chk = requirePairMember(pid, mid);
+    if (chk.error) return fail(res, 403, chk.error);
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no'
+    });
+    res.write('retry: 3000\n\n');
+    res.write('data: ' + JSON.stringify(chk.pair) + '\n\n');
+    subscribe(pid, res);
+    return;
+  }
+
+  if (pathname.startsWith('/api/')) {
+    try {
+      const body = req.method === 'POST' ? await readBody(req) : {};
+      routeApi(req.method, pathname, body, res);
+    } catch (e) {
+      fail(res, 400, e.message || '请求无效');
+    }
+    return;
+  }
+
+  if (pathname === '/health') return json(res, 200, { ok: true, name: 'couple-home', ts: Date.now() });
+
+  serveStatic(req, res, pathname);
+});
+
+function routeApi(method, p, body, res) {
+  const pairId = body.pairId, memberId = body.memberId;
+
+  // ---- 配对 ----
+  if (method === 'POST' && p === '/api/pair/create') {
+    const pair = newPair(body.nickname, 'boy');
+    save();
+    return ok(res, { pairId: pair.id, memberId: Object.keys(pair.members)[0], code: pair.code, pair });
+  }
+  if (method === 'POST' && p === '/api/pair/join') {
+    const code = String(body.code || '').trim().toUpperCase();
+    const pair = Object.values(db.pairs).find((x) => x.code === code && Object.keys(x.members).length < 2);
+    if (!pair) return fail(res, 404, '邀请码无效，或小屋已经有两个人啦');
+    const member = newMember(pair.id, body.nickname, 'girl');
+    save();
+    broadcast(pair.id);
+    return ok(res, { pairId: pair.id, memberId: member.id, code: pair.code, pair });
+  }
+  if (method === 'GET' && p.startsWith('/api/pair/')) {
+    const parts = p.split('/');
+    const chk = requirePairMember(parts[3], parts[4]);
+    if (chk.error) return fail(res, 403, chk.error);
+    return ok(res, { pair: chk.pair, memberId: parts[4] });
+  }
+  if (method === 'POST' && p === '/api/sync') {
+    const chk = requirePairMember(pairId, memberId);
+    if (chk.error) return fail(res, 403, chk.error);
+    return ok(res, { pair: chk.pair, memberId });
+  }
+
+  // ---- 需要成员身份 ----
+  const chk = requirePairMember(pairId, memberId);
+  if (chk.error) return fail(res, 403, chk.error);
+  const { pair, member } = chk;
+  const changed = () => { save(); broadcast(pair.id); };
+
+  if (method === 'POST' && p === '/api/profile') {
+    if (body.nickname !== undefined) {
+      const n = String(body.nickname).trim().slice(0, 20);
+      if (n) member.nickname = n;
+    }
+    if (body.role !== undefined && (body.role === 'boy' || body.role === 'girl')) member.role = body.role;
+    if (body.avatar !== undefined) {
+      if (body.avatar === null) member.avatar = null;
+      else { assertSize(body.avatar, MAX_IMAGE_BYTES); member.avatar = body.avatar; }
+    }
+    changed();
+    return ok(res, { pair, memberId });
+  }
+  if (method === 'POST' && p === '/api/background') {
+    if (member.role !== 'girl') return fail(res, 403, '只有女方可以更换背景哦');
+    if (body.image === undefined) return fail(res, 400, '缺少图片');
+    if (body.image === null) pair.background = null;
+    else { assertSize(body.image, MAX_IMAGE_BYTES); pair.background = body.image; }
+    changed();
+    return ok(res, { pair, memberId });
+  }
+  if (method === 'POST' && p === '/api/status') {
+    if (body.appName !== undefined || body.packageName !== undefined) {
+      member.status = {
+        type: 'app',
+        name: String(body.appName || '未知应用').slice(0, 40),
+        packageName: String(body.packageName || '').slice(0, 120),
+        ts: Date.now()
+      };
+    } else if (body.manualStatus !== undefined) {
+      const s = String(body.manualStatus || '').trim();
+      member.status = s ? { type: 'manual', name: s.slice(0, 40), ts: Date.now() } : null;
+    }
+    changed();
+    return ok(res, { pair, memberId });
+  }
+  if (method === 'POST' && p === '/api/note') {
+    const date = String(body.date || todayStr());
+    const text = String(body.text || '').trim().slice(0, 200);
+    if (!text) return fail(res, 400, '便签内容不能为空');
+    member.todayNote = { date, text, updatedAt: Date.now() };
+    changed();
+    return ok(res, { pair, memberId });
+  }
+  if (method === 'POST' && p === '/api/entry') {
+    const type = body.type === 'food' ? 'food' : 'mood';
+    const text = String(body.text || '').trim().slice(0, 500);
+    const emoji = String(body.emoji || '').slice(0, 8);
+    let image = null;
+    if (body.image) { assertSize(body.image, MAX_IMAGE_BYTES); image = body.image; }
+    if (!text && !emoji && !image) return fail(res, 400, '至少填写一点内容哦');
+    pair.entries.push({
+      id: uid('e'), memberId, type, text, emoji, image,
+      date: String(body.date || todayStr()), createdAt: Date.now()
+    });
+    changed();
+    return ok(res, { pair, memberId });
+  }
+  if (method === 'POST' && p === '/api/entry/delete') {
+    const i = pair.entries.findIndex((x) => x.id === body.entryId);
+    if (i >= 0) { pair.entries.splice(i, 1); changed(); }
+    return ok(res, { pair, memberId });
+  }
+  if (method === 'POST' && p === '/api/todo') {
+    const text = String(body.text || '').trim().slice(0, 200);
+    if (!text) return fail(res, 400, '待办内容不能为空');
+    pair.todos.unshift({ id: uid('t'), text, done: false, createdBy: memberId, createdAt: Date.now(), doneAt: null });
+    changed();
+    return ok(res, { pair, memberId });
+  }
+  if (method === 'POST' && p === '/api/todo/toggle') {
+    const t = pair.todos.find((x) => x.id === body.todoId);
+    if (t) { t.done = !!body.done; t.doneAt = t.done ? Date.now() : null; changed(); }
+    return ok(res, { pair, memberId });
+  }
+  if (method === 'POST' && p === '/api/todo/delete') {
+    const i = pair.todos.findIndex((x) => x.id === body.todoId);
+    if (i >= 0) { pair.todos.splice(i, 1); changed(); }
+    return ok(res, { pair, memberId });
+  }
+  if (method === 'POST' && p === '/api/anniversary') {
+    const d = String(body.date || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return fail(res, 400, '日期格式应为 YYYY-MM-DD');
+    pair.anniversary = d;
+    changed();
+    return ok(res, { pair, memberId });
+  }
+
+  // ---- 音乐 ----
+  if (method === 'POST' && p === '/api/music/pick') {
+    const source = body.source === 'upload' ? 'upload' : 'builtin';
+    const trackId = String(body.trackId || '');
+    if (!trackId) return fail(res, 400, '缺少曲目');
+    if (source === 'upload' && !pair.music.tracks.some((t) => t.id === trackId)) return fail(res, 404, '曲目不存在');
+    pair.music.nowPlaying = { trackId, source, chosenBy: memberId, updatedAt: Date.now() };
+    changed();
+    return ok(res, { pair, memberId });
+  }
+  if (method === 'POST' && p === '/api/music/add') {
+    const title = String(body.title || '我的音乐').trim().slice(0, 60);
+    const dataUrl = String(body.dataUrl || '');
+    if (!dataUrl.startsWith('data:audio/')) return fail(res, 400, '仅支持音频文件');
+    assertSize(dataUrl, MAX_AUDIO_BYTES);
+    const track = { id: uid('mu'), title, dataUrl, addedBy: memberId, addedAt: Date.now() };
+    pair.music.tracks.push(track);
+    if (!pair.music.nowPlaying) {
+      pair.music.nowPlaying = { trackId: track.id, source: 'upload', chosenBy: memberId, updatedAt: Date.now() };
+    }
+    changed();
+    return ok(res, { pair, memberId });
+  }
+  if (method === 'POST' && p === '/api/music/remove') {
+    const trackId = String(body.trackId || '');
+    const i = pair.music.tracks.findIndex((t) => t.id === trackId);
+    if (i >= 0) {
+      if (pair.music.nowPlaying && pair.music.nowPlaying.source === 'upload' && pair.music.nowPlaying.trackId === trackId) {
+        return fail(res, 400, '这首歌正在播放，先切换到别的歌再删除吧');
+      }
+      pair.music.tracks.splice(i, 1);
+      changed();
+    }
+    return ok(res, { pair, memberId });
+  }
+
+  fail(res, 404, '接口不存在');
+}
+
+// ---------------- 静态资源 ----------------
+const MIME = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif',
+  '.svg': 'image/svg+xml', '.webp': 'image/webp', '.ico': 'image/x-icon',
+  '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.m4a': 'audio/mp4', '.wav': 'audio/wav',
+  '.txt': 'text/plain; charset=utf-8'
+};
+function serveStatic(req, res, p) {
+  let rel;
+  try { rel = decodeURIComponent(p); } catch (e) { return fail(res, 400, '无效路径'); }
+  if (rel === '/' || rel === '') rel = '/index.html';
+  const filePath = path.normalize(path.join(PUBLIC_DIR, rel));
+  if (!filePath.startsWith(PUBLIC_DIR)) return fail(res, 403, 'forbidden');
+  fs.readFile(filePath, (err, data) => {
+    if (err) return fail(res, 404, 'not found');
+    const ext = path.extname(filePath).toLowerCase();
+    const noCache = rel === '/index.html' || rel === '/sw.js' || rel === '/manifest.webmanifest';
+    res.writeHead(200, {
+      'Content-Type': MIME[ext] || 'application/octet-stream',
+      'Cache-Control': noCache ? 'no-cache' : 'public, max-age=3600'
+    });
+    res.end(data);
+  });
+}
+
+server.listen(PORT, HOST, () => {
+  console.log('❤ 我们的小屋服务已启动: http://localhost:' + PORT);
+  console.log('   数据目录: ' + DATA_DIR);
+});
+
