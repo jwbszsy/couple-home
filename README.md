@@ -158,3 +158,9 @@ Dockerfile              一键部署
 | V2 生产化 | Firebase/对象存储、推送通知、iOS 版、账号找回 | 约 2–4 人周 | +2–4 周 |
 
 报价区间因地区/交付方式差异较大，MVP 参考区间见对话结论。
+
+## 在线访问（Suga 免费托管）
+
+- 网址：https://dnlkuyfydrrq-production-3cxuxq9p.australia-southeast1.suga.run
+- 平台：Suga（Free Plan，免信用卡）；自动休眠，访问时自动唤醒。
+- 说明：免费平台会休眠且存储有限，正式长期使用建议迁移到国内云服务器（阿里云/腾讯云轻量，约 ¥50-100/年）。
