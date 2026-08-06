@@ -27,6 +27,7 @@ const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 去掉易混淆字�
 // ---------------- 持久化 ----------------
 let db = { pairs: {} };
 try { db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8')); } catch (e) { /* 首次运行 */ }
+for (const pid of Object.keys(db.pairs || {})) normalizePair(db.pairs[pid]);
 
 let saveQueued = false;
 function save() {
@@ -91,6 +92,16 @@ function assertSize(dataUrl, maxBytes) {
   }
 }
 
+
+// 兼容旧数据：补齐字段（避免老数据缺字段导致前端报错）
+function normalizePair(pair) {
+  if (!pair.music) pair.music = { tracks: [], nowPlaying: null };
+  if (!pair.music.tracks) pair.music.tracks = [];
+  if (!Array.isArray(pair.entries)) pair.entries = [];
+  for (const e of pair.entries) { if (!Array.isArray(e.comments)) e.comments = []; }
+  return pair;
+}
+
 // ---------------- SSE 实时推送 ----------------
 const clients = new Map(); // pairId -> Set<res>
 function subscribe(pairId, res) {
@@ -104,6 +115,7 @@ function subscribe(pairId, res) {
 function broadcast(pairId) {
   const pair = db.pairs[pairId];
   if (!pair) return;
+  normalizePair(pair);
   const payload = 'data: ' + JSON.stringify(pair) + '\n\n';
   const set = clients.get(pairId);
   if (!set) return;
@@ -114,7 +126,7 @@ setInterval(() => {
 }, 25000).unref();
 
 // ---------------- 业务逻辑 ----------------
-function getPair(pairId) { return db.pairs[pairId] || null; }
+function getPair(pairId) { const pair = db.pairs[pairId]; return pair ? normalizePair(pair) : null; }
 function requirePairMember(pairId, memberId) {
   const pair = getPair(pairId);
   if (!pair) return { error: '小屋不存在' };
@@ -282,7 +294,7 @@ function routeApi(method, p, body, res) {
     if (body.image) { assertSize(body.image, MAX_IMAGE_BYTES); image = body.image; }
     if (!text && !emoji && !image) return fail(res, 400, '至少填写一点内容哦');
     pair.entries.push({
-      id: uid('e'), memberId, type, text, emoji, image,
+      id: uid('e'), memberId, type, text, emoji, image, comments: [],
       date: String(body.date || todayStr()), createdAt: Date.now()
     });
     changed();
@@ -293,6 +305,30 @@ function routeApi(method, p, body, res) {
     if (i >= 0) { pair.entries.splice(i, 1); changed(); }
     return ok(res, { pair, memberId });
   }
+  if (method === 'POST' && p === '/api/entry/comment') {
+    const entry = pair.entries.find((x) => x.id === body.entryId);
+    if (!entry) return fail(res, 404, '记录不存在');
+    const text = String(body.text || '').trim().slice(0, 500);
+    let image = null;
+    if (body.image) { assertSize(body.image, MAX_IMAGE_BYTES); image = body.image; }
+    if (!text && !image) return fail(res, 400, '评论不能为空');
+    entry.comments = entry.comments || [];
+    entry.comments.push({ id: uid('c'), memberId, text, image, createdAt: Date.now() });
+    changed();
+    return ok(res, { pair, memberId });
+  }
+  if (method === 'POST' && p === '/api/entry/comment/delete') {
+    const entry = pair.entries.find((x) => x.id === body.entryId);
+    if (!entry) return fail(res, 404, '记录不存在');
+    entry.comments = entry.comments || [];
+    const i = entry.comments.findIndex((c) => c.id === body.commentId);
+    if (i < 0) return fail(res, 404, '评论不存在');
+    if (entry.comments[i].memberId !== memberId) return fail(res, 403, '只能删除自己的评论哦');
+    entry.comments.splice(i, 1);
+    changed();
+    return ok(res, { pair, memberId });
+  }
+
   if (method === 'POST' && p === '/api/todo') {
     const text = String(body.text || '').trim().slice(0, 200);
     if (!text) return fail(res, 400, '待办内容不能为空');
@@ -320,10 +356,11 @@ function routeApi(method, p, body, res) {
 
   // ---- 音乐 ----
   if (method === 'POST' && p === '/api/music/pick') {
-    const source = body.source === 'upload' ? 'upload' : 'builtin';
+    const source = (body.source === 'upload' || body.source === 'online') ? body.source : 'builtin';
     const trackId = String(body.trackId || '');
     if (!trackId) return fail(res, 400, '缺少曲目');
     if (source === 'upload' && !pair.music.tracks.some((t) => t.id === trackId)) return fail(res, 404, '曲目不存在');
+    if (source === 'online' && !/^ol_[A-Za-z0-9_]+$/.test(trackId)) return fail(res, 404, '曲目不存在');
     pair.music.nowPlaying = { trackId, source, chosenBy: memberId, updatedAt: Date.now() };
     changed();
     return ok(res, { pair, memberId });

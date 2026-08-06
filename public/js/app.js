@@ -1,5 +1,5 @@
-﻿// app.js —— 主控制器：配对 / 实时同步 / 音乐播放 / 计时器 / 彩蛋
-import { BUILTIN_TRACKS, MusicEngine } from './music.js';
+// app.js —— 主控制器：配对 / 实时同步 / 音乐播放 / 计时器 / 彩蛋
+import { BUILTIN_TRACKS, findOnlineTrack, MusicEngine } from './music.js';
 import { $, $$, esc, toast, todayKey, daysTogether } from './ui.js';
 import * as api from './api.js';
 import { render } from './views.js';
@@ -17,20 +17,29 @@ const state = {
   interacted: false
 };
 
+// 解析曲目对象（内置 / 上传 / 在线）
+function resolveMusicTrack(np) {
+  if (!np) return null;
+  if (np.source === 'builtin') return BUILTIN_TRACKS.find((t) => t.id === np.trackId) || null;
+  if (np.source === 'online') return findOnlineTrack(np.trackId);
+  return (state.pair && state.pair.music.tracks.find((t) => t.id === np.trackId)) || null;
+}
+
 // ---------------- 音乐控制器 ----------------
+// 暂停（pause）会保留当前曲目信息：这样对方只是勾个待办、写个便签等无关同步不会把歌又播起来。
 const music = {
   engine: new MusicEngine(),
-  audio: null,            // 上传音乐的 <audio>
-  current: null,          // {source, trackId}
+  audio: null,            // 上传 / 在线音乐的 <audio>
+  current: null,          // {source, trackId} —— 暂停时也保留
   isPlaying() {
     if (this.current && this.current.source === 'builtin') return this.engine.isPlaying();
-    if (this.current && this.current.source === 'upload') return !!(this.audio && !this.audio.paused && !this.audio.ended);
+    if (this.current && (this.current.source === 'upload' || this.current.source === 'online')) {
+      return !!(this.audio && !this.audio.paused && !this.audio.ended);
+    }
     return false;
   },
   async start(np) {
-    const track = np.source === 'builtin'
-      ? BUILTIN_TRACKS.find((t) => t.id === np.trackId)
-      : (state.pair.music.tracks.find((t) => t.id === np.trackId) || null);
+    const track = resolveMusicTrack(np);
     if (!track) return;
     this.stopAll();
     this.current = { source: np.source, trackId: np.trackId };
@@ -38,11 +47,18 @@ const music = {
       await this.engine.resume();
       this.engine.play(track);
     } else {
-      this.audio = new Audio(track.dataUrl);
+      this.audio = new Audio(track.dataUrl || track.url);
       this.audio.loop = true;
       this.audio.volume = 0.8;
+      this.audio.onerror = () => { /* 在线曲目加载失败时静默，靠用户重新点击 */ };
       try { await this.audio.play(); } catch (e) { throw e; }
     }
+    updateMusicBar();
+  },
+  // 用户手动暂停：保留 current，便于恢复，且不会被无关实时同步重启
+  pause() {
+    if (this.current && this.current.source === 'builtin') this.engine.stop();
+    if (this.audio) { try { this.audio.pause(); } catch (e) { /* ignore */ } }
     updateMusicBar();
   },
   stopAll() {
@@ -54,14 +70,25 @@ const music = {
     this.stopAll();
     updateMusicBar();
   },
-  toggle() {
+  async toggle() {
     if (!state.pair || !state.pair.music.nowPlaying) { toast('先去“音乐”页选一首歌吧 🎵'); return; }
-    if (this.isPlaying()) { this.stop(); }
-    else { this.start(state.pair.music.nowPlaying).catch(() => toast('播放失败，点一下屏幕再试试')); }
+    const np = state.pair.music.nowPlaying;
+    const same = this.current && this.current.source === np.source && this.current.trackId === np.trackId;
+    if (this.isPlaying()) { this.pause(); return; }
+    if (same && this.current.source === 'builtin') {
+      const track = resolveMusicTrack(np);
+      await this.engine.resume();
+      if (track) this.engine.play(track);
+    } else if (same && this.audio) {
+      try { await this.audio.play(); } catch (e) { toast('播放失败，点一下屏幕再试试'); }
+    } else {
+      try { await this.start(np); } catch (e) { toast('播放失败，点一下屏幕再试试'); }
+    }
+    updateMusicBar();
   }
 };
 
-// 同步到当前选中的歌（对方换歌时自动切换）
+// 同步到当前选中的歌（对方换歌时自动切换；用户手动暂停后不再被无关同步重启）
 function syncMusic() {
   const np = state.pair.music.nowPlaying;
   const same = music.current && np && music.current.source === np.source && music.current.trackId === np.trackId;
@@ -75,13 +102,8 @@ function syncMusic() {
   if (!state.interacted) {
     // 未交互前尝试自动播放；若被浏览器拦截则显示“点一下”浮层
     music.start(np).then(() => {
-      if (music.current && music.current.source === 'builtin' && music.engine.ctx && music.engine.ctx.state === 'running') {
-        state.interacted = true;
-      } else if (music.current && music.current.source === 'upload' && music.audio && !music.audio.paused) {
-        state.interacted = true;
-      } else {
-        showTapHint();
-      }
+      if (music.isPlaying()) state.interacted = true;
+      else showTapHint();
     }).catch(() => showTapHint());
   }
 }
@@ -94,8 +116,8 @@ function showTapHint() {
   d.addEventListener('pointerdown', () => {
     d.remove();
     state.interacted = true;
-    music.engine.resume().then(() => { if (state.pair && state.pair.music.nowPlaying) music.start(state.pair.music.nowPlaying).catch(() => {}); });
-    if (music.audio && music.audio.paused) music.audio.play().catch(() => {});
+    if (state.pair && state.pair.music.nowPlaying) music.toggle().catch(() => {});
+    else music.engine.resume().catch(() => {});
   }, { once: true });
   document.body.appendChild(d);
 }
@@ -105,9 +127,7 @@ function updateMusicBar() {
   const np = state.pair && state.pair.music.nowPlaying;
   if (!np) { bar.classList.add('hidden'); return; }
   bar.classList.remove('hidden');
-  const track = np.source === 'builtin'
-    ? BUILTIN_TRACKS.find((t) => t.id === np.trackId)
-    : (state.pair.music.tracks.find((t) => t.id === np.trackId) || null);
+  const track = resolveMusicTrack(np);
   const chooser = np.chosenBy ? (state.pair.members[np.chosenBy] || {}).nickname : '';
   $('#mb-title').textContent = track ? (track.emoji + ' ' + track.title) : '未知曲目';
   $('#mb-sub').textContent = (chooser ? chooser + ' 点的歌' : '我们的小屋') + (music.isPlaying() ? ' · 播放中' : ' · 已暂停');
@@ -118,8 +138,8 @@ function updateMusicBar() {
 // ---------------- 状态应用 ----------------
 function apply(pair) {
   state.pair = pair;
-  state.me = pair.members[localMemberId()];
-  state.partner = Object.values(pair.members).find((m) => m.id !== state.me.id) || null;
+  state.me = pair.members[localMemberId()] || null;
+  state.partner = Object.values(pair.members).find((m) => m.id !== (state.me && state.me.id)) || null;
   applyBackground();
   updateTimer();
   syncMusic();
@@ -185,16 +205,15 @@ function boot(token) {
       apply(pair);
       // 换歌提示
       const np = pair.music.nowPlaying;
-      if (np && oldNp && (np.trackId !== oldNp.trackId || np.source !== oldNp.source) && np.chosenBy !== state.me.id) {
-        const t = np.source === 'builtin' ? BUILTIN_TRACKS.find((x) => x.id === np.trackId) : pair.music.tracks.find((x) => x.id === np.trackId);
+      if (np && oldNp && (np.trackId !== oldNp.trackId || np.source !== oldNp.source) && np.chosenBy !== (state.me && state.me.id)) {
+        const t = resolveMusicTrack(np);
         if (t) toast('TA 点了《' + t.title + '》 🎶');
       }
     });
     // 未交互时尝试自动播放
     if (state.pair.music.nowPlaying) {
       music.start(state.pair.music.nowPlaying).then(() => {
-        if (music.engine.ctx && music.engine.ctx.state === 'running') state.interacted = true;
-        else if (music.audio && !music.audio.paused) state.interacted = true;
+        if (music.isPlaying()) state.interacted = true;
         else showTapHint();
       }).catch(() => showTapHint());
     }
@@ -257,7 +276,7 @@ function bindGlobalGesture() {
       state.interacted = true;
       music.engine.resume();
       if (state.pair && state.pair.music.nowPlaying && !music.isPlaying()) {
-        music.start(state.pair.music.nowPlaying).catch(() => {});
+        music.toggle().catch(() => {});
       }
     }
   };
@@ -287,5 +306,3 @@ function init() {
 }
 
 init();
-
-

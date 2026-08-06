@@ -44,24 +44,31 @@ export function daysTogether(anniversary) {
   };
 }
 
-// 图片压缩（canvas）→ dataURL
+// 图片压缩（canvas）→ dataURL；失败时给出友好提示
 export function compressImage(file, maxDim, quality) {
   quality = quality == null ? 0.85 : quality;
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
+      const raw = reader.result;
       const img = new Image();
       img.onload = () => {
-        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
-        const w = Math.max(1, Math.round(img.width * scale));
-        const h = Math.max(1, Math.round(img.height * scale));
-        const canvas = document.createElement('canvas');
-        canvas.width = w; canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/jpeg', quality));
+        try {
+          const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+          const w = Math.max(1, Math.round(img.width * scale));
+          const h = Math.max(1, Math.round(img.height * scale));
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        } catch (err) {
+          // canvas 被污染或转换失败 → 图片不大时退回原图，否则提示换一张
+          if (raw && raw.length < 4.5 * 1024 * 1024) resolve(raw);
+          else reject(new Error('图片处理失败，请换一张试试'));
+        }
       };
-      img.onerror = () => reject(new Error('图片解析失败，请换一张'));
-      img.src = reader.result;
+      img.onerror = () => reject(new Error('图片解析失败：如果是 iPhone 的 HEIC 照片，请先在相册里转成 JPEG/PNG 再上传'));
+      img.src = raw;
     };
     reader.onerror = () => reject(new Error('文件读取失败'));
     reader.readAsDataURL(file);

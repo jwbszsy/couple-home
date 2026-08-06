@@ -27,6 +27,8 @@ export function setStatus(pairId, memberId, patch) { return post('/api/status', 
 export function setNote(pairId, memberId, date, text) { return post('/api/note', { pairId, memberId, date, text }); }
 export function addEntry(pairId, memberId, entry) { return post('/api/entry', Object.assign({ pairId, memberId }, entry)); }
 export function deleteEntry(pairId, memberId, entryId) { return post('/api/entry/delete', { pairId, memberId, entryId }); }
+export function addComment(pairId, memberId, entryId, text, image) { return post('/api/entry/comment', { pairId, memberId, entryId, text, image }); }
+export function deleteComment(pairId, memberId, entryId, commentId) { return post('/api/entry/comment/delete', { pairId, memberId, entryId, commentId }); }
 export function addTodo(pairId, memberId, text) { return post('/api/todo', { pairId, memberId, text }); }
 export function toggleTodo(pairId, memberId, todoId, done) { return post('/api/todo/toggle', { pairId, memberId, todoId, done }); }
 export function deleteTodo(pairId, memberId, todoId) { return post('/api/todo/delete', { pairId, memberId, todoId }); }

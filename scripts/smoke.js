@@ -41,6 +41,27 @@ async function post(path, body) {
   const ef = await post('/api/entry', { pairId, memberId: girlId, type: 'food', text: '火锅', emoji: '🍲' });
   check('干饭记录', ef.ok && ef.data.pair.entries.length === 2);
 
+
+  // ---- 时间线评论 ----
+  const entryId = ef.data.pair.entries[1].id;
+  const cm = await post('/api/entry/comment', { pairId, memberId: girlId, entryId, text: '看起来好好吃！', image: 'data:image/jpeg;base64,AAAA' });
+  check('评论动态（文字+图片）', cm.ok && cm.data.pair.entries[1].comments.length === 1);
+  const commentId = cm.data.pair.entries[1].comments[0].id;
+  const cmBad = await post('/api/entry/comment/delete', { pairId, memberId: boyId, entryId, commentId });
+  check('不能删除他人评论', !cmBad.ok);
+  const cmDel = await post('/api/entry/comment/delete', { pairId, memberId: girlId, entryId, commentId });
+  check('删除自己的评论', cmDel.ok && cmDel.data.pair.entries[1].comments.length === 0);
+  const cmEmpty = await post('/api/entry/comment', { pairId, memberId: girlId, entryId, text: '' });
+  check('空评论被拒绝', !cmEmpty.ok);
+
+  // ---- 在线音乐 ----
+  const mo = await post('/api/music/pick', { pairId, memberId: girlId, trackId: 'ol_song1', source: 'online' });
+  check('在线音乐点歌', mo.ok && mo.data.pair.music.nowPlaying.source === 'online' && mo.data.pair.music.nowPlaying.trackId === 'ol_song1');
+
+  // ---- 头像上传 ----
+  const avp = await post('/api/profile', { pairId, memberId: boyId, avatar: 'data:image/jpeg;base64,AAAA' });
+  check('头像上传', avp.ok && avp.data.pair.members[boyId].avatar !== null);
+
   const td = await post('/api/todo', { pairId, memberId: girlId, text: '一起看电影' });
   const todoId = td.data.pair.todos[0].id;
   check('添加待办', td.ok);

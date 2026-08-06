@@ -1,5 +1,5 @@
 ﻿// views.js —— 五个页面的渲染与交互
-import { BUILTIN_TRACKS } from './music.js';
+import { BUILTIN_TRACKS, ONLINE_TRACKS, findOnlineTrack } from './music.js';
 import {
   $, $$, esc, toast, todayKey, fmtClock, daysTogether, compressImage,
   readAudioDataUrl, avatarHtml, openModal, confirmModal
@@ -14,8 +14,16 @@ const MOODS = [
 
 const ROLE_LABEL = { boy: '男朋友', girl: '女朋友' };
 
+// 每条动态待发送的评论图片（key=entryId）
+let pendingCommentImg = {};
+
 export function render(view, ctx) {
   const state = ctx.state;
+  if (!state.pair || !state.me) {
+    $('#view').innerHTML = '<div class="empty"><span class="empty-emoji">☁️</span>正在同步小屋数据…</div>';
+    $$('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
+    return;
+  }
   const html = VIEWS[view] ? VIEWS[view](ctx) : '<div class="empty">页面不存在</div>';
   $('#view').innerHTML = html;
   $$('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
@@ -111,6 +119,7 @@ function timelineHtml(ctx) {
     html += '<div class="day-group"><div class="day-label">' + esc(dayLabel(date)) + '</div>';
     for (const e of groups[date]) {
       const m = pair.members[e.memberId] || { nickname: '??', role: 'boy' };
+      const comments = Array.isArray(e.comments) ? e.comments : [];
       html += '<div class="entry">' +
         avatarHtml(m, 'entry-avatar') +
         '<div class="entry-body">' +
@@ -121,7 +130,8 @@ function timelineHtml(ctx) {
         '</div>' +
         (e.emoji ? '<div class="entry-emoji">' + esc(e.emoji) + '</div>' : '') +
         (e.text ? '<div class="entry-text">' + esc(e.text) + '</div>' : '') +
-        (e.image ? '<img class="entry-img" src="' + e.image + '" alt="图片" />' : '') +
+        (e.image ? '<img class="entry-img viewable-img" data-src="' + e.image + '" src="' + e.image + '" alt="图片" />' : '') +
+        entryCommentsHtml(pair, me, e, comments) +
         '</div></div>';
     }
     html += '</div>';
@@ -148,6 +158,102 @@ function bindTimeline(ctx) {
   $('#view').prepend(bar);
   $('#tl-mood').onclick = () => moodModal(ctx);
   $('#tl-food').onclick = () => foodModal(ctx);
+
+  // 评论：发送（文字 + 图片）
+  $$('.comment-send', view).forEach((btn) => {
+    btn.onclick = () => sendComment(ctx, btn.dataset.entry);
+  });
+  $$('.comment-input', view).forEach((inp) => {
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendComment(ctx, inp.dataset.entry); } });
+  });
+  // 评论：选图
+  $$('.comment-img-btn', view).forEach((btn) => {
+    btn.onclick = () => {
+      const entryId = btn.dataset.entry;
+      const fileInp = document.createElement('input');
+      fileInp.type = 'file'; fileInp.accept = 'image/*';
+      fileInp.onchange = async () => {
+        const f = fileInp.files && fileInp.files[0];
+        if (!f) return;
+        try {
+          const dataUrl = await compressImage(f, 900, 0.82);
+          pendingCommentImg[entryId] = dataUrl;
+          const chip = document.querySelector('.comment-pending[data-entry="' + entryId + '"]');
+          if (chip) chip.classList.remove('hidden');
+          toast('已选择评论图片 📷');
+        } catch (err) { toast(err.message); }
+      };
+      fileInp.click();
+    };
+  });
+  // 评论：移除已选图片
+  $$('.comment-clear-img', view).forEach((btn) => {
+    btn.onclick = () => {
+      delete pendingCommentImg[btn.dataset.entry];
+      const chip = document.querySelector('.comment-pending[data-entry="' + btn.dataset.entry + '"]');
+      if (chip) chip.classList.add('hidden');
+    };
+  });
+  // 评论：删除（仅自己的）
+  $$('.comment-del', view).forEach((btn) => {
+    btn.onclick = () => {
+      confirmModal('删除这条评论？', '删除后双方都看不到了哦。', async () => {
+        try {
+          const d = await api.deleteComment(pair.id, me.id, btn.dataset.entry, btn.dataset.comment);
+          ctx.apply(d.pair);
+        } catch (e) { toast(e.message); }
+      }, '删除');
+    };
+  });
+  // 图片查看：轻点放大
+  $$('.viewable-img', view).forEach((img) => {
+    img.onclick = () => {
+      const m = openModal('<img class="lightbox-img" src="' + img.dataset.src + '" alt="图片" />');
+      m.root.addEventListener('click', (e) => { if (e.target === m.root) m.close(); });
+    };
+  });
+}
+
+async function sendComment(ctx, entryId) {
+  const { pair, me } = ctx.state;
+  const inp = document.querySelector('.comment-input[data-entry="' + entryId + '"]');
+  const text = inp ? inp.value.trim() : '';
+  const image = pendingCommentImg[entryId] || null;
+  if (!text && !image) { toast('写点什么再发吧～'); return; }
+  try {
+    const d = await api.addComment(pair.id, me.id, entryId, text, image);
+    if (inp) inp.value = '';
+    delete pendingCommentImg[entryId];
+    ctx.apply(d.pair);
+    toast('评论已发送 💬');
+  } catch (e) { toast(e.message); }
+}
+
+
+function entryCommentsHtml(pair, me, entry, comments) {
+  let h = '<div class="entry-comments">';
+  if (comments.length) {
+    for (const c of comments) {
+      const cm = pair.members[c.memberId] || { nickname: '??', role: 'boy' };
+      h += '<div class="comment">' +
+        avatarHtml(cm, 'comment-avatar') +
+        '<div class="comment-body">' +
+        '<div class="comment-head"><b>' + esc(cm.nickname) + '</b><span>' + fmtClock(c.createdAt) + '</span>' +
+        (c.memberId === me.id ? '<button class="comment-del" data-entry="' + entry.id + '" data-comment="' + c.id + '" title="删除评论">✕</button>' : '') +
+        '</div>' +
+        (c.text ? '<div class="comment-text">' + esc(c.text) + '</div>' : '') +
+        (c.image ? '<img class="comment-img viewable-img" data-src="' + c.image + '" src="' + c.image + '" alt="评论图片" />' : '') +
+        '</div></div>';
+    }
+  }
+  h += '<div class="comment-box">' +
+    '<input class="comment-input" data-entry="' + entry.id + '" maxlength="500" placeholder="评论一下 TA 的动态…" />' +
+    '<button class="comment-img-btn" data-entry="' + entry.id + '" title="添加图片">📷</button>' +
+    '<button class="comment-send" data-entry="' + entry.id + '">发送</button>' +
+    '</div>' +
+    '<div class="comment-pending hidden" data-entry="' + entry.id + '"><span>已选 1 张图片</span><button class="comment-clear-img" data-entry="' + entry.id + '">✕ 移除</button></div>' +
+    '</div>';
+  return h;
 }
 
 function dayLabel(key) {
@@ -241,6 +347,18 @@ function musicHtml(ctx) {
       '</div>';
   }
 
+
+  let online = '';
+  for (const t of ONLINE_TRACKS) {
+    const active = np && np.source === 'online' && np.trackId === t.id;
+    online += '<div class="track-item' + (active ? ' active' : '') + '" data-pick="' + t.id + '" data-src="online">' +
+      '<div class="track-emoji">' + t.emoji + '</div>' +
+      '<div class="track-info"><div class="track-name">' + esc(t.title) + ' <span class="badge badge-o">在线</span></div>' +
+      '<div class="track-desc">' + esc(t.desc) + '</div></div>' +
+      (active ? '<span class="badge badge-o">播放中</span>' : '') +
+      '</div>';
+  }
+
   let uploads = '';
   if (!pair.music.tracks.length) {
     uploads = '<div class="muted small" style="padding:4px 2px;">还没有上传音乐。双方都能上传，上传后两人都能听到。</div>';
@@ -258,6 +376,8 @@ function musicHtml(ctx) {
 
   return nowHtml +
     '<div class="card"><div class="card-title">🎵 内置音乐（纯合成，无版权）</div>' + builtin + '</div>' +
+    '<div class="card"><div class="card-title">🌐 在线音乐库（联网播放）</div>' + online +
+    '<p class="muted small" style="padding:2px 2px 0;">在线曲目需要网络，加载快慢取决于网络环境；双方听到的是同一首 🎧</p></div>' +
     '<div class="card"><div class="card-title">📤 我们的音乐</div>' + uploads +
     '<button class="btn-ghost" id="music-upload" style="margin-top:10px;">＋ 上传一首歌</button></div>' +
     '<p class="muted small" style="padding:0 4px;">选好后，双方进入软件都会自动听到这首歌 💕</p>';
@@ -265,6 +385,7 @@ function musicHtml(ctx) {
 
 function resolveTrack(pair, np) {
   if (np.source === 'upload') return pair.music.tracks.find((t) => t.id === np.trackId) || null;
+  if (np.source === 'online') return findOnlineTrack(np.trackId);
   return BUILTIN_TRACKS.find((t) => t.id === np.trackId) || null;
 }
 
@@ -407,7 +528,13 @@ function bindProfile(ctx) {
     if (count >= 5) {
       count = 0;
       toast('🎉 彩蛋触发！前往邦多利…');
-      window.open('https://bang-dream.com/', '_blank');
+      // 优先开新标签页；若被浏览器/内置浏览器拦截，则直接当前页跳转
+      try {
+        const w = window.open('https://bang-dream.com/', '_blank');
+        if (!w) location.href = 'https://bang-dream.com/';
+      } catch (e) {
+        location.href = 'https://bang-dream.com/';
+      }
     }
   };
 }

@@ -53,6 +53,32 @@ export const BUILTIN_TRACKS = [
   }
 ];
 
+
+// 在线音乐库：免费可在线播放的演示曲目（SoundHelix 开放示例曲，直接流式播放，无需上传）
+// 说明：在线曲目需要网络，加载速度取决于网络环境；双方选同一首会“同步”听到同一首歌。
+export const ONLINE_TRACKS = [
+  { id: 'ol_song1',  title: '晨光漫步', emoji: '🌅', desc: '轻快的出发，像和你一起的每一天', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
+  { id: 'ol_song2',  title: '微风午后', emoji: '🍃', desc: '懒洋洋的下午茶时间', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3' },
+  { id: 'ol_song3',  title: '心动节奏', emoji: '💓', desc: '忍不住想跳舞的小节拍', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3' },
+  { id: 'ol_song4',  title: '星夜低语', emoji: '🌙', desc: '夜深了，轻轻跟你说晚安', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3' },
+  { id: 'ol_song5',  title: '蜜糖心情', emoji: '🍯', desc: '甜甜的，像想你的时候', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3' },
+  { id: 'ol_song6',  title: '慢慢喜欢你', emoji: '🐢', desc: '不着急，我们慢慢来', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3' },
+  { id: 'ol_song7',  title: '彩虹泡泡', emoji: '🌈', desc: '五颜六色的小确幸', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3' },
+  { id: 'ol_song8',  title: '云端散步', emoji: '☁️', desc: '一起在云朵上走一走', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3' },
+  { id: 'ol_song9',  title: '初雪告白', emoji: '❄️', desc: '第一场雪时想说的话', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3' },
+  { id: 'ol_song10', title: '暖阳奶茶', emoji: '🧋', desc: '冬日的暖阳和热奶茶', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3' },
+  { id: 'ol_song11', title: '月光小夜曲', emoji: '🎻', desc: '月光下的安静拥抱', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3' },
+  { id: 'ol_song12', title: '心跳加速', emoji: '💘', desc: '见到你的第一眼', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3' },
+  { id: 'ol_song13', title: '海边慢跑', emoji: '🏖️', desc: '咸咸的风和你的笑', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-13.mp3' },
+  { id: 'ol_song14', title: '落日余晖', emoji: '🌇', desc: '把晚霞装进我们的相册', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-14.mp3' },
+  { id: 'ol_song15', title: '柠檬汽水', emoji: '🥤', desc: '清爽得冒泡的夏天', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-15.mp3' },
+  { id: 'ol_song16', title: '晚安宝贝', emoji: '🌛', desc: '抱着你，做个好梦', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-16.mp3' }
+];
+
+export function findOnlineTrack(id) {
+  return ONLINE_TRACKS.find((t) => t.id === id) || null;
+}
+
 function midiHz(m) { return 440 * Math.pow(2, (m - 69) / 12); }
 
 export class MusicEngine {
