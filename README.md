@@ -1,4 +1,4 @@
-﻿# 🏠 我们的小屋
+# 🏠 我们的小屋
 
 情侣专属的实时互动小软件（PWA，可安装到手机桌面）。只有你们两个人，用邀请码配对，数据不公开。
 
@@ -10,16 +10,17 @@
 
 | 功能 | 说明 |
 | --- | --- |
-| 📱 实时状态共享 | 对方当前正在用什么 App（安卓伴侣端自动上报；网页端可手动分享） |
+| 📱 实时状态共享 | 对方当前正在用什么（网页端手动分享“我在用…”） |
 | 😊 今日心情 | 文字 + 表情，按时间线展示 |
 | 🍜 今天吃了啥 | 文字 / 图片，双方可见 |
 | 💬 时间线评论 | 可对对方的动态评论（文字 + 图片），实时同步 |
 | ✅ 共享清单 | 待办事项，可勾选完成，实时同步 |
 | 💌 每日小便签 | 每人每天一句“最想对对方说的话”，对方首页实时预览 |
 | 🖼 个人形象 | 双方各自设置头像；**背景仅女方可更换** |
-| ⏱ 在一起天数 | 右上角常驻“X天X小时”计时器，从纪念日算起 |
+| ⏱ 在一起天数 | 右上角常驻“X天X小时”计时器，点一下即可修改起始日期 |
+| 🎊 纪念日 | 可添加多个重要日子，自动显示“已 X 天 / 还有 X 天”，双方可见 |
 | 🎵 双人音乐播放器 | 任一方选歌，**双方进软件都能听到**；内置 4 首纯合成音乐（无版权）、**16 首在线音乐库（联网播放）**，也可上传自己的歌 |
-| 🎁 彩蛋 | 设置页连续点击开发者名字 5 次 → 跳转邦多利官网 |
+| 🎁 彩蛋 | 设置页连点开发者名字 10 次 → 可选跳转邦多利官网 / 输入密码进入 gbcnina 暴君模式（满屏像素爱心 + 烟花炸弹刷屏） |
 | 🔐 配对与隐私 | 邀请码 8 位，一个小屋最多 2 人；数据仅双方可见 |
 
 ---
@@ -81,19 +82,6 @@ docker run -d -p 3000:3000 -v couple-data:/app/data --name couple-home couple-ho
 
 ---
 
-## 🤖 安卓“实时状态”伴侣端
-
-网页端无法读取前台 App（浏览器沙箱限制）。安卓端可用系统 `UsageStatsManager` 读取。
-
-- 源码在 [`android/`](./android)，Kotlin + 前台服务，每 12 秒上报一次；
-- 安装步骤见 [`android/README.md`](./android/README.md)；
-- 在网页「我的」页复制 Pair ID + Member ID，填入伴侣端即可；
-- 需要用户手动授予 **“使用情况访问”权限**（系统设置里开启）。
-
-**iOS 说明**：iOS 系统限制，第三方 App 无法读取当前前台应用，因此 iOS 上只能使用网页端手动分享状态（“我在用…”）。
-
----
-
 ## 🎵 音乐播放器说明
 
 - **内置音乐**：4 首由 Web Audio 实时合成的轻音乐（晨光/星夜/心动/软绵绵），不需要音频文件、无版权风险，双方听到的完全一致；
@@ -122,13 +110,12 @@ server.js               零依赖 Node 服务端（http + SSE + JSON 持久化�
 data/db.json            运行时数据（自动生成，勿提交）
 scripts/smoke.js        端到端接口测试
 scripts/seed-demo.js    演示数据
-android/                安卓伴侣端（Kotlin 前台服务）
 Dockerfile              一键部署
 ```
 
 - **实时推送**：SSE（`GET /api/events/:pairId/:memberId`），断线自动重连；`?poll=1` 可切换为轮询（兼容不支持 SSE 的反代）。
 - **持久化**：`data/db.json` 原子写入，重启不丢数据。
-- **API 一览**：`/api/pair/create`、`/api/pair/join`、`/api/profile`、`/api/background`（仅女方）、`/api/status`、`/api/note`、`/api/entry`、`/api/entry/comment`、`/api/entry/comment/delete`、`/api/todo`、`/api/anniversary`、`/api/music/pick|add|remove`、`/api/sync`、`/health`。
+- **API 一览**：`/api/pair/create`、`/api/pair/join`、`/api/profile`、`/api/background`（仅女方）、`/api/status`、`/api/note`、`/api/entry`、`/api/entry/comment`、`/api/entry/comment/delete`、`/api/todo`、`/api/anniversary|add|remove`、`/api/tyrant`、`/api/music/pick|add|remove`、`/api/sync`、`/health`。
 
 ---
 
@@ -149,7 +136,6 @@ Dockerfile              一键部署
 ├── public/       前端
 ├── scripts/      测试与演示
 ├── data/         运行时数据（git 忽略）
-└── android/      安卓伴侣端
 ```
 
 ## 🧩 工作量评估（参考）
@@ -157,7 +143,7 @@ Dockerfile              一键部署
 | 阶段 | 内容 | 工作量 | 建议周期 |
 | --- | --- | --- | --- |
 | MVP（本项目） | PWA + 自托管实时后端 + 内置音乐 + 配对 | 约 2–3 人天 | 3–5 天 |
-| V1 打磨 | 上线部署、HTTPS、安卓伴侣端打包签名 | 约 3–5 人天 | +1 周 |
+| V1 打磨 | 上线部署、HTTPS、推送通知 | 约 3–5 人天 | +1 周 |
 | V2 生产化 | Firebase/对象存储、推送通知、iOS 版、账号找回 | 约 2–4 人周 | +2–4 周 |
 
 报价区间因地区/交付方式差异较大，MVP 参考区间见对话结论。

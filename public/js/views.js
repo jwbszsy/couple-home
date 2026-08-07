@@ -1,4 +1,4 @@
-﻿// views.js —— 五个页面的渲染与交互
+// views.js —— 五个页面的渲染与交互
 import { BUILTIN_TRACKS, ONLINE_TRACKS, findOnlineTrack } from './music.js';
 import {
   $, $$, esc, toast, todayKey, fmtClock, daysTogether, compressImage,
@@ -13,6 +13,7 @@ const MOODS = [
 ];
 
 const ROLE_LABEL = { boy: '男朋友', girl: '女朋友' };
+const TYRANT_PWD = 'hsn67';
 
 // 每条动态待发送的评论图片（key=entryId）
 let pendingCommentImg = {};
@@ -74,7 +75,8 @@ function homeHtml(ctx) {
     '<button class="quick-item" id="q-food"><div class="quick-emoji">🍜</div><div class="quick-label">记吃了啥</div><div class="quick-desc">文字 / 图片</div></button>' +
     '<button class="quick-item" id="q-status"><div class="quick-emoji">📱</div><div class="quick-label">我在用…</div><div class="quick-desc">手动分享状态</div></button>' +
     '<button class="quick-item" id="q-music"><div class="quick-emoji">🎵</div><div class="quick-label">一起听歌</div><div class="quick-desc">选一首我们都听到</div></button>' +
-    '</div>';
+    '</div>' +
+    anniversariesCardHtml(pair);
 }
 
 function minsAgo(ts) {
@@ -103,6 +105,63 @@ function bindHome(ctx) {
   $('#q-food').onclick = () => foodModal(ctx);
   $('#q-status').onclick = () => statusModal(ctx);
   $('#q-music').onclick = () => ctx.go('music');
+  $('#anv-add').onclick = () => annivAddModal(ctx);
+  $$('.anv-del').forEach((b) => {
+    b.onclick = async () => {
+      try {
+        const d = await api.removeAnniversary(pair.id, me.id, b.dataset.anv);
+        ctx.apply(d.pair); toast('纪念日已删除');
+      } catch (e) { toast(e.message); }
+    };
+  });
+}
+
+function anniversariesCardHtml(pair) {
+  const list = Array.isArray(pair.anniversaries) ? pair.anniversaries : [];
+  if (!list.length) {
+    return '<div class="card"><div class="card-title">🎊 纪念日</div>' +
+      '<p class="muted small">记录你们的重要日子，自动倒计时～</p>' +
+      '<button class="btn-ghost" id="anv-add" style="width:100%;margin-top:10px;">＋ 添加纪念日</button></div>';
+  }
+  return '<div class="card"><div class="card-title">🎊 纪念日</div><div class="anv-list">' +
+    list.map((a) => {
+      const diff = annivDays(a.date);
+      const label = diff === null ? '' : diff === 0 ? '🎉 就是今天！' : diff > 0 ? '还有 ' + diff + ' 天' : '已 ' + (-diff) + ' 天';
+      return '<div class="anv-row"><div class="anv-info"><div class="anv-title">' + esc(a.title) + '</div>' +
+        '<div class="anv-date">' + esc(a.date) + '</div></div>' +
+        '<div class="anv-days">' + label + '</div>' +
+        '<button class="anv-del" data-anv="' + esc(a.id) + '" title="删除">✕</button></div>';
+    }).join('') + '</div>' +
+    '<button class="btn-ghost" id="anv-add" style="width:100%;margin-top:10px;">＋ 添加纪念日</button></div>';
+}
+
+function annivDays(dateStr) {
+  const p = String(dateStr || '').split('-').map(Number);
+  if (p.length !== 3 || p.some(isNaN)) return null;
+  const d = new Date(p[0], p[1] - 1, p[2], 0, 0, 0);
+  const t = new Date(); t.setHours(0, 0, 0, 0);
+  return Math.round((d.getTime() - t.getTime()) / 86400000);
+}
+
+function annivAddModal(ctx) {
+  const { pair, me } = ctx.state;
+  const m = openModal(
+    '<h3>🎊 添加纪念日</h3>' +
+    '<div class="field"><label>名称</label><input id="anv-title" maxlength="30" placeholder="例如：认识一周年" /></div>' +
+    '<div class="field"><label>日期</label><input type="date" id="anv-date" value="' + todayKey() + '" /></div>' +
+    '<div class="modal-actions"><button class="btn-ghost" id="anv-cancel">取消</button><button class="btn-primary" id="anv-ok">保存</button></div>'
+  );
+  $('#anv-cancel').onclick = () => m.close();
+  $('#anv-ok').onclick = async () => {
+    const title = $('#anv-title').value.trim();
+    const date = $('#anv-date').value;
+    if (!title) { toast('给纪念日起个名字吧'); return; }
+    if (!date) { toast('请选择日期'); return; }
+    try {
+      const d = await api.addAnniversary(pair.id, me.id, title, date);
+      ctx.apply(d.pair); m.close(); toast('纪念日已添加 🎊');
+    } catch (e) { toast(e.message); }
+  };
 }
 
 // ---------- 时间线 ----------
@@ -172,9 +231,12 @@ function bindTimeline(ctx) {
       const entryId = btn.dataset.entry;
       const fileInp = document.createElement('input');
       fileInp.type = 'file'; fileInp.accept = 'image/*';
+      fileInp.style.display = 'none';
+      document.body.appendChild(fileInp);
+      const cleanup = () => { if (fileInp.parentNode) fileInp.parentNode.removeChild(fileInp); };
       fileInp.onchange = async () => {
         const f = fileInp.files && fileInp.files[0];
-        if (!f) return;
+        if (!f) { cleanup(); return; }
         try {
           const dataUrl = await compressImage(f, 900, 0.82);
           pendingCommentImg[entryId] = dataUrl;
@@ -182,6 +244,7 @@ function bindTimeline(ctx) {
           if (chip) chip.classList.remove('hidden');
           toast('已选择评论图片 📷');
         } catch (err) { toast(err.message); }
+        cleanup();
       };
       fileInp.click();
     };
@@ -454,20 +517,12 @@ function profileHtml(ctx) {
     '</div>' +
 
     '<div class="card">' +
-    '<div class="card-title">🤖 安卓实时状态伴侣端</div>' +
-    '<p class="muted small" style="line-height:1.8;">在安卓手机上安装“伴侣端”后，填入下面的令牌即可自动分享你正在使用的 App（需要“使用情况访问权限”）。</p>' +
-    '<div class="field" style="margin-top:10px;"><label>Pair ID</label><input type="text" readonly value="' + esc(pair.id) + '" id="copy-pair" /></div>' +
-    '<div class="field"><label>Member ID（本机）</label><input type="text" readonly value="' + esc(me.id) + '" id="copy-member" /></div>' +
-    '<button class="btn-ghost" id="copy-token" style="width:100%;">复制令牌（PairID + MemberID）</button>' +
-    '</div>' +
-
-    '<div class="card">' +
     '<div class="card-title">⚙️ 设置</div>' +
     '<div class="setting-row"><div><div class="setting-label">重新配对 / 退出</div><div class="setting-desc">清除本机数据，重新创建或加入</div></div>' +
     '<button class="btn-danger" id="reset-app">退出</button></div>' +
     '</div>' +
 
-    '<div class="dev-credit">由 <span class="dev-name" id="dev-name">杨皓翔 &amp; 韩诗妮</span> 用心制作<br/><span class="small muted">连续点我 5 次有惊喜哦 🎁</span></div>';
+    '<div class="dev-credit">由 <span class="dev-name" id="dev-name">杨皓翔 &amp; 韩诗妮</span> 制作<br/><span class="small muted">此处有彩蛋</span></div>';
 }
 
 function bindProfile(ctx) {
@@ -506,10 +561,6 @@ function bindProfile(ctx) {
   $('#copy-code').onclick = () => {
     navigator.clipboard.writeText(pair.code).then(() => toast('邀请码已复制：' + pair.code)).catch(() => toast(pair.code));
   };
-  $('#copy-token').onclick = () => {
-    const text = 'pairId=' + pair.id + '\nmemberId=' + me.id;
-    navigator.clipboard.writeText(text).then(() => toast('令牌已复制')).catch(() => toast(text));
-  };
   $('#reset-app').onclick = () => {
     confirmModal('退出当前小屋？', '本机数据将被清除；小屋数据仍保留在服务器上。', () => {
       localStorage.removeItem('couple_token');
@@ -517,25 +568,74 @@ function bindProfile(ctx) {
     }, '退出');
   };
 
-  // 彩蛋：连续点开发者名字 5 次 → 邦多利官网
+  // 彩蛋：连点开发者名字 10 次 → 选择：跳转邦多利 / 输入密码进入 gbcnina 暴君模式
   const dev = $('#dev-name');
   let count = 0, timer = null;
   dev.onclick = () => {
     count++;
     clearTimeout(timer);
     timer = setTimeout(() => { count = 0; }, 2500);
-    if (count === 3) toast('嘿嘿，再点两下…');
-    if (count >= 5) {
+    if (count === 5) toast('嘿嘿，再点五下…');
+    if (count >= 10) {
       count = 0;
-      toast('🎉 彩蛋触发！前往邦多利…');
-      // 优先开新标签页；若被浏览器/内置浏览器拦截，则直接当前页跳转
-      try {
-        const w = window.open('https://bang-dream.com/', '_blank');
-        if (!w) location.href = 'https://bang-dream.com/';
-      } catch (e) {
-        location.href = 'https://bang-dream.com/';
-      }
+      eggMenuModal(ctx);
     }
+  };
+}
+
+// ---------- 彩蛋弹窗 ----------
+function eggMenuModal(ctx) {
+  const m = openModal(
+    '<h3>🥚 彩蛋</h3>' +
+    '<p class="muted small" style="margin:0 0 14px;">选一个神秘入口吧～</p>' +
+    '<div class="modal-actions" style="flex-direction:column;gap:8px;">' +
+    '<button class="btn-primary" id="egg-bang" style="width:100%;">🎸 前往邦多利官网</button>' +
+    '<button class="btn-ghost" id="egg-tyrant" style="width:100%;">😈 gbcnina 暴君模式（需密码）</button>' +
+    '</div>'
+  );
+  $('#egg-bang').onclick = () => {
+    m.close();
+    toast('🎉 前往邦多利…');
+    try {
+      const w = window.open('https://bang-dream.com/', '_blank');
+      if (!w) location.href = 'https://bang-dream.com/';
+    } catch (e) {
+      location.href = 'https://bang-dream.com/';
+    }
+  };
+  $('#egg-tyrant').onclick = () => { m.close(); tyrantLoginModal(ctx); };
+}
+
+function tyrantLoginModal(ctx) {
+  const m = openModal(
+    '<h3>😈 gbcnina 暴君模式</h3>' +
+    '<div class="field"><label>密码</label><input type="password" id="tyrant-pwd" placeholder="输入密码解锁" /></div>' +
+    '<p class="muted small">解锁后可以给对方刷满屏像素爱心 + 烟花炸弹哦</p>' +
+    '<div class="modal-actions"><button class="btn-ghost" id="tyrant-cancel">取消</button><button class="btn-primary" id="tyrant-ok">解锁</button></div>'
+  );
+  $('#tyrant-cancel').onclick = () => m.close();
+  $('#tyrant-ok').onclick = () => {
+    if ($('#tyrant-pwd').value.trim() !== TYRANT_PWD) { toast('密码不对哦 😝'); return; }
+    m.close();
+    tyrantComposeModal(ctx);
+  };
+}
+
+function tyrantComposeModal(ctx) {
+  const { pair, me } = ctx.state;
+  const m = openModal(
+    '<h3>💥 向 TA 开炮</h3>' +
+    '<div class="field"><label>刷屏文字（可留空，只刷爱心）</label><textarea id="tyrant-text" rows="2" maxlength="40" placeholder="写点狠话…"></textarea></div>' +
+    '<p class="muted small">发射后对方屏幕会满屏像素爱心 + 烟花炸弹，TA 要手动点“关闭”才会消失～</p>' +
+    '<div class="modal-actions"><button class="btn-ghost" id="tyrant-cancel">取消</button><button class="btn-primary" id="tyrant-fire">发射 💥</button></div>'
+  );
+  $('#tyrant-cancel').onclick = () => m.close();
+  $('#tyrant-fire').onclick = async () => {
+    const text = $('#tyrant-text').value.trim();
+    try {
+      const d = await api.sendTyrant(pair.id, me.id, text);
+      ctx.apply(d.pair); m.close(); toast('已发射！等 TA 尖叫吧 😈');
+    } catch (e) { toast(e.message); }
   };
 }
 

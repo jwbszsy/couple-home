@@ -1,4 +1,4 @@
-﻿// api.js —— 与后端交互（REST + SSE 实时推送）
+// api.js —— 与后端交互（REST + SSE 实时推送）
 const BASE = '';
 
 async function post(path, body) {
@@ -33,6 +33,9 @@ export function addTodo(pairId, memberId, text) { return post('/api/todo', { pai
 export function toggleTodo(pairId, memberId, todoId, done) { return post('/api/todo/toggle', { pairId, memberId, todoId, done }); }
 export function deleteTodo(pairId, memberId, todoId) { return post('/api/todo/delete', { pairId, memberId, todoId }); }
 export function setAnniversary(pairId, memberId, date) { return post('/api/anniversary', { pairId, memberId, date }); }
+export function addAnniversary(pairId, memberId, title, date) { return post('/api/anniversary/add', { pairId, memberId, title, date }); }
+export function removeAnniversary(pairId, memberId, annivId) { return post('/api/anniversary/remove', { pairId, memberId, annivId }); }
+export function sendTyrant(pairId, memberId, text) { return post('/api/tyrant', { pairId, memberId, text }); }
 export function pickMusic(pairId, memberId, trackId, source) { return post('/api/music/pick', { pairId, memberId, trackId, source }); }
 export function addMusic(pairId, memberId, title, dataUrl) { return post('/api/music/add', { pairId, memberId, title, dataUrl }); }
 export function removeMusic(pairId, memberId, trackId) { return post('/api/music/remove', { pairId, memberId, trackId }); }

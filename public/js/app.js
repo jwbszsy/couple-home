@@ -1,6 +1,6 @@
 // app.js —— 主控制器：配对 / 实时同步 / 音乐播放 / 计时器 / 彩蛋
 import { BUILTIN_TRACKS, findOnlineTrack, MusicEngine } from './music.js';
-import { $, $$, esc, toast, todayKey, daysTogether } from './ui.js';
+import { $, $$, esc, toast, todayKey, daysTogether, openModal } from './ui.js';
 import * as api from './api.js';
 import { render } from './views.js';
 
@@ -143,7 +143,132 @@ function apply(pair) {
   applyBackground();
   updateTimer();
   syncMusic();
+  maybeShowTyrant(pair);
   if (!inputFocused()) render(state.view, ctx); else deferRender();
+}
+
+// ---------------- gbcnina 暴君刷屏（接收端） ----------------
+function maybeShowTyrant(pair) {
+  const t = pair && pair.tyrant;
+  if (!t || !t.id) return;
+  if (document.querySelector('.tyrant-overlay')) return;
+  if (state.me && t.fromMemberId === state.me.id) return;
+  const key = 'couple_tyrant_seen_' + pair.id;
+  let seen = [];
+  try { seen = JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { seen = []; }
+  if (seen.indexOf(t.id) >= 0) return;
+  seen.push(t.id);
+  try { localStorage.setItem(key, JSON.stringify(seen)); } catch (e) { /* 忽略 */ }
+  showTyrantOverlay(t);
+}
+
+const PX_HEART_COLORS = ['#ff4d6d', '#ff6b81', '#ff8fab', '#ff2e63', '#ffb3c6'];
+const PX_HEART_ROWS = ['.XX.XX.', 'XXXXXXX', 'XXXXXXX', '.XXXXX.', '..XXX..', '...X...'];
+
+function pixelHeartUrl(color) {
+  let rects = '';
+  PX_HEART_ROWS.forEach((row, y) => {
+    for (let x = 0; x < row.length; x++) if (row[x] === 'X') rects += '<rect x="' + x + '" y="' + y + '" width="1" height="1"/>';
+  });
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 6" shape-rendering="crispEdges"><g fill="' + color + '">' + rects + '</g></svg>';
+  return 'data:image/svg+xml,' + encodeURIComponent(svg);
+}
+
+function showTyrantOverlay(t) {
+  if (document.querySelector('.tyrant-overlay')) return;
+  const ov = document.createElement('div');
+  ov.className = 'tyrant-overlay';
+  ov.innerHTML =
+    '<div class="tyrant-sky" id="tyrant-sky"></div>' +
+    (t.text ? '<div class="tyrant-text">' + esc(t.text) + '</div>' : '') +
+    '<button class="tyrant-close" id="tyrant-close">关闭 💗</button>';
+  document.body.appendChild(ov);
+
+  const sky = $('#tyrant-sky');
+  const closeBtn = $('#tyrant-close');
+  for (let i = 0; i < 26; i++) {
+    const h = document.createElement('span');
+    h.className = 'tyrant-heart';
+    const size = 18 + Math.random() * 30;
+    h.style.width = size + 'px';
+    h.style.height = Math.round(size * 0.75) + 'px';
+    h.style.backgroundImage = 'url(' + pixelHeartUrl(PX_HEART_COLORS[i % PX_HEART_COLORS.length]) + ')';
+    h.style.left = Math.random() * 100 + '%';
+    h.style.animationDuration = (4 + Math.random() * 4) + 's';
+    h.style.animationDelay = (Math.random() * 6) + 's';
+    sky.appendChild(h);
+  }
+
+  const timers = [
+    setInterval(() => { if (ov.parentNode) spawnFirework(sky); }, 1300),
+    setInterval(() => { if (ov.parentNode) spawnBomb(sky); }, 3200)
+  ];
+  closeBtn.onclick = () => {
+    timers.forEach(clearInterval);
+    ov.remove();
+  };
+}
+
+function spawnFirework(sky) {
+  const f = document.createElement('div');
+  f.className = 'tyrant-firework';
+  f.style.left = (10 + Math.random() * 80) + '%';
+  f.style.top = (15 + Math.random() * 45) + '%';
+  const flash = document.createElement('div');
+  flash.className = 'tyrant-flash';
+  flash.style.background = 'radial-gradient(circle, ' + PX_HEART_COLORS[Math.floor(Math.random() * PX_HEART_COLORS.length)] + ' 0%, rgba(255,255,255,0) 70%)';
+  f.appendChild(flash);
+  for (let i = 0; i < 16; i++) {
+    const p = document.createElement('span');
+    p.className = 'fx-particle';
+    const ang = (Math.PI * 2 * i) / 16 + Math.random() * 0.4;
+    const dist = 40 + Math.random() * 60;
+    p.style.setProperty('--dx', Math.cos(ang) * dist + 'px');
+    p.style.setProperty('--dy', Math.sin(ang) * dist + 'px');
+    p.style.background = PX_HEART_COLORS[i % PX_HEART_COLORS.length];
+    p.style.animationDelay = (Math.random() * 0.15) + 's';
+    f.appendChild(p);
+  }
+  sky.appendChild(f);
+  setTimeout(() => f.remove(), 1600);
+}
+
+function spawnBomb(sky) {
+  const b = document.createElement('div');
+  b.className = 'tyrant-bomb';
+  b.textContent = '💣';
+  b.style.left = (10 + Math.random() * 80) + '%';
+  b.style.animationDuration = (1.2 + Math.random() * 0.8) + 's';
+  sky.appendChild(b);
+  b.addEventListener('animationend', () => {
+    const r = b.getBoundingClientRect();
+    b.remove();
+    spawnBoom(r.left + r.width / 2, r.top + r.height / 2);
+  });
+}
+
+function spawnBoom(x, y) {
+  const boom = document.createElement('div');
+  boom.className = 'tyrant-boom';
+  boom.style.left = x + 'px';
+  boom.style.top = y + 'px';
+  const flash = document.createElement('div');
+  flash.className = 'tyrant-flash';
+  flash.style.background = 'radial-gradient(circle, #ffd166 0%, rgba(255,255,255,0) 70%)';
+  boom.appendChild(flash);
+  for (let i = 0; i < 20; i++) {
+    const p = document.createElement('span');
+    p.className = 'fx-particle';
+    const ang = (Math.PI * 2 * i) / 20 + Math.random() * 0.5;
+    const dist = 50 + Math.random() * 90;
+    p.style.setProperty('--dx', Math.cos(ang) * dist + 'px');
+    p.style.setProperty('--dy', Math.sin(ang) * dist + 'px');
+    p.style.background = PX_HEART_COLORS[i % PX_HEART_COLORS.length];
+    p.style.animationDelay = (Math.random() * 0.12) + 's';
+    boom.appendChild(p);
+  }
+  document.body.appendChild(boom);
+  setTimeout(() => boom.remove(), 1500);
 }
 
 function localMemberId() {
@@ -178,6 +303,27 @@ function updateTimer() {
   const t = daysTogether(state.pair.anniversary);
   if (t.days > 0) chip.textContent = '💕 在一起 ' + t.days + '天' + t.hours + '时';
   else chip.textContent = '💕 今天开始 ' + t.hours + '时' + t.mins + '分';
+}
+
+function timerChipModal() {
+  if (!state.pair || !state.me) return;
+  const m = openModal(
+    '<h3>⏱ 修改在一起纪念日</h3>' +
+    '<div class="field"><label>从哪天开始算？</label><input type="date" id="tc-date" value="' + esc(state.pair.anniversary) + '" /></div>' +
+    '<p class="muted small">保存后右上角计时器会从新日期重新计算。</p>' +
+    '<div class="modal-actions"><button class="btn-ghost" id="tc-cancel">取消</button><button class="btn-primary" id="tc-ok">保存</button></div>'
+  );
+  $('#tc-cancel').onclick = () => m.close();
+  $('#tc-ok').onclick = async () => {
+    const d = $('#tc-date').value;
+    if (!d) { toast('请选择日期'); return; }
+    try {
+      const x = await api.setAnniversary(state.pair.id, state.me.id, d);
+      ctx.apply(x.pair);
+      m.close();
+      toast('纪念日已更新 💕');
+    } catch (e) { toast(e.message); }
+  };
 }
 
 // ctx 暴露给 views
@@ -267,6 +413,7 @@ function bindNav() {
   });
   $('#mb-play').onclick = () => music.toggle();
   $('#mb-open').onclick = () => ctx.go('music');
+  $('#timer-chip').onclick = () => timerChipModal();
 }
 
 function bindGlobalGesture() {

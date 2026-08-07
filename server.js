@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 /**
  * 我们的小屋 —— 情侣专属实时互动小软件（服务端）
@@ -99,6 +99,7 @@ function normalizePair(pair) {
   if (!pair.music.tracks) pair.music.tracks = [];
   if (!Array.isArray(pair.entries)) pair.entries = [];
   for (const e of pair.entries) { if (!Array.isArray(e.comments)) e.comments = []; }
+  if (!Array.isArray(pair.anniversaries)) pair.anniversaries = [];
   return pair;
 }
 
@@ -160,7 +161,8 @@ function newPair(nickname, role) {
     members: {},
     entries: [],      // { id, memberId, type:'mood'|'food', text, emoji, image, date, createdAt }
     todos: [],        // { id, text, done, createdBy, createdAt, doneAt }
-    music: { tracks: [], nowPlaying: null } // tracks: { id, title, dataUrl, addedBy, addedAt }
+    music: { tracks: [], nowPlaying: null }, // tracks: { id, title, dataUrl, addedBy, addedAt }
+    anniversaries: [] // { id, title, date, createdBy, createdAt }
   };
   db.pairs[pairId] = pair;
   newMember(pairId, nickname, role);
@@ -350,6 +352,27 @@ function routeApi(method, p, body, res) {
     const d = String(body.date || '');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return fail(res, 400, '日期格式应为 YYYY-MM-DD');
     pair.anniversary = d;
+    changed();
+    return ok(res, { pair, memberId });
+  }
+  if (method === 'POST' && p === '/api/anniversary/add') {
+    const title = String(body.title || '').trim().slice(0, 30);
+    if (!title) return fail(res, 400, '纪念日名称不能为空');
+    const date = String(body.date || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return fail(res, 400, '日期格式应为 YYYY-MM-DD');
+    pair.anniversaries.push({ id: uid('an'), title, date, createdBy: memberId, createdAt: Date.now() });
+    changed();
+    return ok(res, { pair, memberId });
+  }
+  if (method === 'POST' && p === '/api/anniversary/remove') {
+    const annivId = String(body.annivId || '');
+    const i = pair.anniversaries.findIndex((a) => a.id === annivId);
+    if (i >= 0) { pair.anniversaries.splice(i, 1); changed(); }
+    return ok(res, { pair, memberId });
+  }
+  if (method === 'POST' && p === '/api/tyrant') {
+    const text = String(body.text || '').trim().slice(0, 40);
+    pair.tyrant = { id: uid('t'), text, fromMemberId: memberId, ts: Date.now() };
     changed();
     return ok(res, { pair, memberId });
   }

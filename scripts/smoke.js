@@ -1,4 +1,4 @@
-﻿// smoke.js —— 端到端接口测试（node scripts/smoke.js）
+// smoke.js —— 端到端接口测试（node scripts/smoke.js）
 const BASE = process.env.BASE || 'http://localhost:3000';
 let passed = 0, failed = 0;
 function check(name, cond) { if (cond) { passed++; console.log('  ok  ' + name); } else { failed++; console.log('  FAIL ' + name); } }
@@ -70,6 +70,17 @@ async function post(path, body) {
 
   const av = await post('/api/anniversary', { pairId, memberId: girlId, date: '2023-02-14' });
   check('纪念日设置', av.ok && av.data.pair.anniversary === '2023-02-14');
+
+  const anAdd = await post('/api/anniversary/add', { pairId, memberId: boyId, title: '认识纪念日', date: '2025-01-01' });
+  check('添加纪念日', anAdd.ok && anAdd.data.pair.anniversaries.length === 1);
+  const anId = anAdd.data.pair.anniversaries[0].id;
+  const anBad = await post('/api/anniversary/add', { pairId, memberId: girlId, title: '', date: '2025-01-01' });
+  check('空名称纪念日被拒绝', !anBad.ok);
+  const anRm = await post('/api/anniversary/remove', { pairId, memberId: girlId, annivId: anId });
+  check('删除纪念日', anRm.ok && anRm.data.pair.anniversaries.length === 0);
+
+  const ty = await post('/api/tyrant', { pairId, memberId: boyId, text: '想你了！' });
+  check('暴君刷屏发送', ty.ok && ty.data.pair.tyrant && ty.data.pair.tyrant.text === '想你了！' && ty.data.pair.tyrant.fromMemberId === boyId);
 
   const mp = await post('/api/music/pick', { pairId, memberId: boyId, trackId: 'bt_sunrise', source: 'builtin' });
   check('点内置歌', mp.ok && mp.data.pair.music.nowPlaying.trackId === 'bt_sunrise');
