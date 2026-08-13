@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
@@ -51,6 +51,7 @@
       <div class="seg" id="onboard-seg">
         <button class="seg-btn active" data-mode="create">创建小屋</button>
         <button class="seg-btn" data-mode="join">加入小屋</button>
+        <button class="seg-btn" data-mode="restore">恢复账号</button>
       </div>
 
       <form id="onboard-form" class="onboard-form">
@@ -58,9 +59,16 @@
           <label>对方给你的邀请码</label>
           <input id="join-code" maxlength="8" placeholder="例如 A3F9KQ7X" autocomplete="off" />
         </div>
-        <div class="field">
+        <div id="restore-wrap" class="field hidden">
+          <label>Pair ID（电脑网页版「我的」页可复制）</label>
+          <input id="restore-pair" maxlength="40" placeholder="p_xxxxxxxx" autocomplete="off" />
+          <label style="display:block;margin-top:10px;">Member ID</label>
+          <input id="restore-member" maxlength="40" placeholder="m_xxxxxxxx" autocomplete="off" />
+          <p class="muted small" style="margin-top:8px;">在电脑网页版「我的」页复制令牌，粘贴到这里就能找回原来的身份与数据。</p>
+        </div>
+        <div class="field" id="nickname-wrap">
           <label>我的昵称（对方会看到）</label>
-          <input id="join-nickname" maxlength="20" placeholder="怎么称呼你？" required />
+          <input id="join-nickname" maxlength="20" placeholder="怎么称呼你？" />
         </div>
         <button type="submit" class="btn-primary" id="onboard-submit">开始 💗</button>
         <p id="onboard-err" class="err hidden"></p>

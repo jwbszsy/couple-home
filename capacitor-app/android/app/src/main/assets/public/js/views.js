@@ -684,6 +684,9 @@ function profileHtml(ctx) {
     '<div class="setting-row"><div><div class="setting-label">邀请码</div><div class="setting-desc">对方用这个码加入</div></div>' +
     '<div style="display:flex;gap:6px;align-items:center;"><b style="letter-spacing:2px;">' + esc(pair.code) + '</b>' +
     '<button class="btn-ghost" id="copy-code" style="padding:5px 12px;font-size:12px;">复制</button></div></div>' +
+    '<div class="setting-row" style="flex-direction:column;align-items:stretch;"><div><div class="setting-label">我的令牌（换设备找回账号）</div><div class="setting-desc">新设备选「恢复账号」粘贴</div></div>' +
+    '<div class="token-box">' + esc(pair.id) + '<br/>' + esc(me.id) + '</div>' +
+    '<button class="btn-ghost" id="copy-token" style="width:100%;margin-top:8px;">复制令牌</button></div>' +
     '<div class="setting-row" style="flex-direction:column;align-items:stretch;"><div><div class="setting-label">爱情宣言</div><div class="setting-desc">写一句我们的话（首页展示）</div></div>' +
     '<div style="display:flex;gap:8px;margin-top:8px;"><input id="declaration-input" maxlength="60" placeholder="例如：世界很大，只有我们。" value="' + esc(pair.declaration) + '" /><button class="btn-ghost" id="declaration-save" style="flex:none;">保存</button></div></div>' +
     '</div>' +
@@ -765,6 +768,10 @@ function bindProfile(ctx) {
     document.body.appendChild(a); a.click(); a.remove();
     URL.revokeObjectURL(a.href);
     toast('已导出备份文件 💾');
+  };
+  $('#copy-token').onclick = () => {
+    const text = pair.id + '\n' + me.id;
+    navigator.clipboard.writeText(text).then(() => toast('令牌已复制，去新设备「恢复账号」粘贴吧')).catch(() => toast(text));
   };
   $('#copy-code').onclick = () => {
     navigator.clipboard.writeText(pair.code).then(() => toast('邀请码已复制：' + pair.code)).catch(() => toast(pair.code));

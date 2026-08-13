@@ -417,6 +417,8 @@ function bindOnboard() {
     mode = b.dataset.mode;
     $$('.seg-btn', seg).forEach((x) => x.classList.toggle('active', x === b));
     $('#join-code-wrap').classList.toggle('hidden', mode !== 'join');
+    $('#restore-wrap').classList.toggle('hidden', mode !== 'restore');
+    $('#nickname-wrap').classList.toggle('hidden', mode === 'restore');
   });
   $('#onboard-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -424,6 +426,23 @@ function bindOnboard() {
     const code = $('#join-code').value.trim().toUpperCase();
     const err = $('#onboard-err');
     err.classList.add('hidden');
+    if (mode === 'restore') {
+      const rPair = $('#restore-pair').value.trim();
+      const rMember = $('#restore-member').value.trim();
+      if (!rPair || !rMember) { err.textContent = '请填写 Pair ID 和 Member ID'; err.classList.remove('hidden'); return; }
+      const rbtn = $('#onboard-submit');
+      rbtn.disabled = true; rbtn.textContent = '等一下下…';
+      try {
+        await api.syncState(rPair, rMember);
+        localStorage.setItem(TOKEN_KEY, JSON.stringify({ pairId: rPair, memberId: rMember }));
+        boot({ pairId: rPair, memberId: rMember });
+      } catch (ex) {
+        err.textContent = ex.message; err.classList.remove('hidden');
+      } finally {
+        rbtn.disabled = false; rbtn.textContent = '开始 💗';
+      }
+      return;
+    }
     if (!nickname) { err.textContent = '先告诉我怎么称呼你～'; err.classList.remove('hidden'); return; }
     const btn = $('#onboard-submit');
     btn.disabled = true; btn.textContent = '等一下下…';
