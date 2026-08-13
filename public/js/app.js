@@ -336,7 +336,7 @@ function inputFocused() {
 
 function updateTimer() {
   const chip = $('#timer-chip');
-  if (!state.pair) return;
+  if (!state.pair || !chip) return;
   const t = daysTogether(state.pair.anniversary);
   if (t.days > 0) chip.textContent = '💕 在一起 ' + t.days + '天' + t.hours + '时';
   else chip.textContent = '💕 今天开始 ' + t.hours + '时' + t.mins + '分';
@@ -475,7 +475,7 @@ function bindNav() {
   });
   $('#mb-play').onclick = () => music.toggle();
   $('#mb-open').onclick = () => ctx.go('music');
-  $('#timer-chip').onclick = () => timerChipModal();
+  const tc = $('#timer-chip'); if (tc) tc.onclick = () => timerChipModal();
 }
 
 function bindGlobalGesture() {
