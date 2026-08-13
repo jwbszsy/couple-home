@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">我们的小屋</string>
+    <string name="title_activity_main">我们的小屋</string>
+    <string name="package_name">com.couplehome.app</string>
+    <string name="custom_url_scheme">com.couplehome.app</string>
+</resources>

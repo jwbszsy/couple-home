@@ -183,6 +183,10 @@ function newPair(nickname, role) {
 
 // ---------------- HTTP 服务 ----------------
 const server = http.createServer(async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
   let pathname;
   try { pathname = new URL(req.url, 'http://localhost').pathname; }
   catch (e) { return fail(res, 400, '无效请求'); }

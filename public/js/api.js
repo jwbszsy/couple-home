@@ -1,5 +1,6 @@
 // api.js —— 与后端交互（REST + SSE 实时推送）
-const BASE = '';
+const isNative = typeof window !== 'undefined' && !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+const BASE = isNative ? 'https://couple-home-production.up.railway.app' : '';
 
 async function post(path, body) {
   let r;
