@@ -60,11 +60,14 @@
           <input id="join-code" maxlength="8" placeholder="例如 A3F9KQ7X" autocomplete="off" />
         </div>
         <div id="restore-wrap" class="field hidden">
-          <label>Pair ID（电脑网页版「我的」页可复制）</label>
-          <input id="restore-pair" maxlength="40" placeholder="p_xxxxxxxx" autocomplete="off" />
-          <label style="display:block;margin-top:10px;">Member ID</label>
-          <input id="restore-member" maxlength="40" placeholder="m_xxxxxxxx" autocomplete="off" />
-          <p class="muted small" style="margin-top:8px;">在电脑网页版「我的」页复制令牌，粘贴到这里就能找回原来的身份与数据。</p>
+          <label>房间码（对方创建后给你的那个）</label>
+          <input id="restore-code" maxlength="8" placeholder="例如 A3F9KQ7X" autocomplete="off" />
+          <label style="display:block;margin-top:10px;">我是（选好后直接恢复这一方的身份）</label>
+          <div class="seg" id="restore-role-seg">
+            <button class="seg-btn active" data-role="boy">🧑 男方</button>
+            <button class="seg-btn" data-role="girl">👩 女方</button>
+          </div>
+          <p class="muted small" style="margin-top:8px;">输入房间码并选男方/女方，就能找回原来那一方的身份与全部数据。</p>
         </div>
         <div class="field" id="nickname-wrap">
           <label>我的昵称（对方会看到）</label>

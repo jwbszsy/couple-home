@@ -21,6 +21,7 @@ async function post(path, body) {
 
 export function createPair(nickname) { return post('/api/pair/create', { nickname }); }
 export function joinPair(code, nickname) { return post('/api/pair/join', { code, nickname }); }
+export function restoreByCode(code, role) { return post('/api/restore', { code, role }); }
 export function syncState(pairId, memberId) { return post('/api/sync', { pairId, memberId }); }
 export function updateProfile(pairId, memberId, patch) { return post('/api/profile', Object.assign({ pairId, memberId }, patch)); }
 export function setBackground(pairId, memberId, image) { return post('/api/background', { pairId, memberId, image }); }

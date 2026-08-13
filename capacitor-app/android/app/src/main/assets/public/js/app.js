@@ -411,14 +411,21 @@ function boot(token) {
 function bindOnboard() {
   const seg = $('#onboard-seg');
   let mode = 'create';
+  let restoreRole = 'boy';
   seg.addEventListener('click', (e) => {
     const b = e.target.closest('.seg-btn');
-    if (!b) return;
+    if (!b || !b.dataset.mode) return;
     mode = b.dataset.mode;
     $$('.seg-btn', seg).forEach((x) => x.classList.toggle('active', x === b));
     $('#join-code-wrap').classList.toggle('hidden', mode !== 'join');
     $('#restore-wrap').classList.toggle('hidden', mode !== 'restore');
     $('#nickname-wrap').classList.toggle('hidden', mode === 'restore');
+  });
+  $('#restore-role-seg').addEventListener('click', (e) => {
+    const b = e.target.closest('.seg-btn');
+    if (!b || !b.dataset.role) return;
+    restoreRole = b.dataset.role;
+    $$('.seg-btn', $('#restore-role-seg')).forEach((x) => x.classList.toggle('active', x === b));
   });
   $('#onboard-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -427,15 +434,14 @@ function bindOnboard() {
     const err = $('#onboard-err');
     err.classList.add('hidden');
     if (mode === 'restore') {
-      const rPair = $('#restore-pair').value.trim();
-      const rMember = $('#restore-member').value.trim();
-      if (!rPair || !rMember) { err.textContent = '请填写 Pair ID 和 Member ID'; err.classList.remove('hidden'); return; }
+      const rCode = $('#restore-code').value.trim().toUpperCase();
+      if (!rCode) { err.textContent = '请输入房间码'; err.classList.remove('hidden'); return; }
       const rbtn = $('#onboard-submit');
       rbtn.disabled = true; rbtn.textContent = '等一下下…';
       try {
-        await api.syncState(rPair, rMember);
-        localStorage.setItem(TOKEN_KEY, JSON.stringify({ pairId: rPair, memberId: rMember }));
-        boot({ pairId: rPair, memberId: rMember });
+        const d = await api.restoreByCode(rCode, restoreRole);
+        localStorage.setItem(TOKEN_KEY, JSON.stringify({ pairId: d.pairId, memberId: d.memberId }));
+        boot({ pairId: d.pairId, memberId: d.memberId });
       } catch (ex) {
         err.textContent = ex.message; err.classList.remove('hidden');
       } finally {

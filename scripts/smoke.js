@@ -22,6 +22,13 @@ async function post(path, body) {
   const j2 = await post('/api/pair/join', { code, nickname: '第三人' });
   check('第三人被拒绝', !j2.ok);
 
+  const rsB = await post('/api/restore', { code, role: 'boy' });
+  check('房间码+男方恢复', rsB.ok && rsB.data.pairId === pairId && rsB.data.memberId === boyId);
+  const rsG = await post('/api/restore', { code, role: 'girl' });
+  check('房间码+女方恢复', rsG.ok && rsG.data.memberId === girlId);
+  const rsBad = await post('/api/restore', { code: 'ZZZZZZZZ', role: 'boy' });
+  check('错误房间码恢复被拒', !rsBad.ok);
+
   const p1 = await post('/api/profile', { pairId, memberId: boyId, nickname: '杨皓翔', role: 'boy' });
   check('更新资料', p1.ok && p1.data.pair.members[boyId].nickname === '杨皓翔');
 

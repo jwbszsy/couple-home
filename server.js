@@ -233,6 +233,15 @@ function routeApi(method, p, body, res) {
     save();
     return ok(res, { pairId: pair.id, memberId: Object.keys(pair.members)[0], code: pair.code, pair });
   }
+  if (method === 'POST' && p === '/api/restore') {
+    const code = String(body.code || '').trim().toUpperCase();
+    const role = body.role === 'girl' ? 'girl' : 'boy';
+    const pair = Object.values(db.pairs).find((x) => x.code === code);
+    if (!pair) return fail(res, 404, '房间码不存在，检查一下哦');
+    const member = Object.values(pair.members).find((m) => m.role === role);
+    if (!member) return fail(res, 404, '这个房间还没有' + (role === 'girl' ? '女方' : '男方') + '的身份，请先用邀请码加入');
+    return ok(res, { pairId: pair.id, memberId: member.id, nickname: member.nickname });
+  }
   if (method === 'POST' && p === '/api/pair/join') {
     const code = String(body.code || '').trim().toUpperCase();
     const pair = Object.values(db.pairs).find((x) => x.code === code && Object.keys(x.members).length < 2);
