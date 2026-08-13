@@ -21,6 +21,9 @@ jobs:
           java-version: '21'
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+      - name: Install Capacitor deps
+        working-directory: capacitor-app
+        run: npm install
       - name: Build debug APK
         working-directory: capacitor-app/android
         run: |
@@ -33,6 +36,15 @@ jobs:
         with:
           name: build-log
           path: capacitor-app/android/build.log
+      - name: Publish failure log
+        if: failure()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-fail-${{ github.run_number }}
+          name: 构建失败日志 #${{ github.run_number }}
+          body: 自动上传的构建失败日志（build.log）
+          files: capacitor-app/android/build.log
+          fail_on_unmatched_files: true
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
