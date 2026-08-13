@@ -21,6 +21,13 @@
 | 🎊 纪念日 | 可添加多个重要日子，自动显示“已 X 天 / 还有 X 天”，双方可见 |
 | 🎵 双人音乐播放器 | 任一方选歌，**双方进软件都能听到**；内置 4 首纯合成音乐（无版权）、**16 首在线音乐库（联网播放）**，也可上传自己的歌 |
 | 🎁 彩蛋 | 设置页连点开发者名字 10 次 → 可选跳转邦多利官网 / 输入密码进入 gbcnina 暴君模式（满屏像素爱心 + 烟花炸弹刷屏） |
+| 💗 想你了打卡 | 每天点一下告诉对方你在想 TA，对方首页实时看到次数 |
+| 🏷 时间线标签 | 动态可加标签（约会/旅行/日常…）并可筛选；支持地点标记 |
+| 📊 互动热力图 | GitHub 风格近 14 周活跃热力图，点击某天可筛选当天记录 |
+| 📊 恋爱数据 | 我的页展示在一起天数、动态/照片/评论/纪念日/清单统计 |
+| 🎨 空间装扮 | 5 套主题色（粉/紫/薄荷/暖阳/静谧蓝），双方可换 |
+| 💌 时空胶囊 | 写一封信给未来，到设定日期双方才能开启 |
+| 💾 数据导出 | 一键导出全部回忆为 JSON 备份文件 |
 | 🔐 配对与隐私 | 邀请码 8 位，一个小屋最多 2 人；数据仅双方可见 |
 
 ---
@@ -115,7 +122,7 @@ Dockerfile              一键部署
 
 - **实时推送**：SSE（`GET /api/events/:pairId/:memberId`），断线自动重连；`?poll=1` 可切换为轮询（兼容不支持 SSE 的反代）。
 - **持久化**：`data/db.json` 原子写入，重启不丢数据。
-- **API 一览**：`/api/pair/create`、`/api/pair/join`、`/api/profile`、`/api/background`（仅女方）、`/api/status`、`/api/note`、`/api/entry`、`/api/entry/comment`、`/api/entry/comment/delete`、`/api/todo`、`/api/anniversary|add|remove`、`/api/tyrant`、`/api/music/pick|add|remove`、`/api/sync`、`/health`。
+- **API 一览**：`/api/pair/create`、`/api/pair/join`、`/api/profile`、`/api/background`（仅女方）、`/api/status`、`/api/note`、`/api/entry`、`/api/entry/comment`、`/api/entry/comment/delete`、`/api/todo`、`/api/anniversary|add|remove`、`/api/tyrant`、`/api/miss`、`/api/theme`、`/api/declaration`、`/api/capsule/add|delete`、`/api/music/pick|add|remove`、`/api/sync`、`/health`。
 
 ---
 

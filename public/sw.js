@@ -1,5 +1,5 @@
 // sw.js —— 离线缓存（PWA 可安装）
-const CACHE = 'couple-home-v4';
+const CACHE = 'couple-home-v5';
 const CORE = [
   '/', '/index.html', '/css/style.css',
   '/js/app.js', '/js/api.js', '/js/ui.js', '/js/music.js', '/js/views.js',

@@ -36,6 +36,11 @@ export function setAnniversary(pairId, memberId, date) { return post('/api/anniv
 export function addAnniversary(pairId, memberId, title, date) { return post('/api/anniversary/add', { pairId, memberId, title, date }); }
 export function removeAnniversary(pairId, memberId, annivId) { return post('/api/anniversary/remove', { pairId, memberId, annivId }); }
 export function sendTyrant(pairId, memberId, text) { return post('/api/tyrant', { pairId, memberId, text }); }
+export function missYou(pairId, memberId) { return post('/api/miss', { pairId, memberId }); }
+export function setTheme(pairId, memberId, theme) { return post('/api/theme', { pairId, memberId, theme }); }
+export function setDeclaration(pairId, memberId, text) { return post('/api/declaration', { pairId, memberId, text }); }
+export function addCapsule(pairId, memberId, title, content, openDate) { return post('/api/capsule/add', { pairId, memberId, title, content, openDate }); }
+export function deleteCapsule(pairId, memberId, capsuleId) { return post('/api/capsule/delete', { pairId, memberId, capsuleId }); }
 export function pickMusic(pairId, memberId, trackId, source) { return post('/api/music/pick', { pairId, memberId, trackId, source }); }
 export function addMusic(pairId, memberId, title, dataUrl) { return post('/api/music/add', { pairId, memberId, title, dataUrl }); }
 export function removeMusic(pairId, memberId, trackId) { return post('/api/music/remove', { pairId, memberId, trackId }); }

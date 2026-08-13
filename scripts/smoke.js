@@ -82,6 +82,24 @@ async function post(path, body) {
   const ty = await post('/api/tyrant', { pairId, memberId: boyId, text: '想你了！' });
   check('暴君刷屏发送', ty.ok && ty.data.pair.tyrant && ty.data.pair.tyrant.text === '想你了！' && ty.data.pair.tyrant.fromMemberId === boyId);
 
+  const mi = await post('/api/miss', { pairId, memberId: boyId });
+  check('想你了打卡', mi.ok && mi.data.pair.members[boyId].missYou && mi.data.pair.members[boyId].missYou.count === 1);
+  const mi2 = await post('/api/miss', { pairId, memberId: boyId });
+  check('想你了再点一次 +1', mi2.ok && mi2.data.pair.members[boyId].missYou.count === 2);
+  const th = await post('/api/theme', { pairId, memberId: boyId, theme: 'mint' });
+  check('更换主题', th.ok && th.data.pair.theme === 'mint');
+  const thBad = await post('/api/theme', { pairId, memberId: boyId, theme: 'nope' });
+  check('非法主题被拒绝', !thBad.ok);
+  const dec = await post('/api/declaration', { pairId, memberId: girlId, text: '世界很大只有我们' });
+  check('爱情宣言', dec.ok && dec.data.pair.declaration === '世界很大只有我们');
+  const cap = await post('/api/capsule/add', { pairId, memberId: boyId, title: '一年后', content: '希望我们还在一起', openDate: '2099-01-01' });
+  check('添加时空胶囊', cap.ok && cap.data.pair.capsules.length === 1);
+  const capId = cap.data.pair.capsules[0].id;
+  const capRm = await post('/api/capsule/delete', { pairId, memberId: girlId, capsuleId: capId });
+  check('删除时空胶囊', capRm.ok && capRm.data.pair.capsules.length === 0);
+  const et = await post('/api/entry', { pairId, memberId: girlId, type: 'food', text: 'tag test', tag: '约会', location: '上海' });
+  check('动态带标签与地点', et.ok && et.data.pair.entries.some((e) => e.tag === '约会' && e.location === '上海'));
+
   const mp = await post('/api/music/pick', { pairId, memberId: boyId, trackId: 'bt_sunrise', source: 'builtin' });
   check('点内置歌', mp.ok && mp.data.pair.music.nowPlaying.trackId === 'bt_sunrise');
 

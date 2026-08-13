@@ -15,6 +15,18 @@ const MOODS = [
 const ROLE_LABEL = { boy: '男朋友', girl: '女朋友' };
 const TYRANT_PWD = 'hsn67';
 
+const ENTRY_TAGS = ['约会', '旅行', '日常', '纪念日', '想吃', '其他'];
+const THEME_LIST = [
+  { key: 'pink', label: '少女粉', color: '#ff8fab' },
+  { key: 'purple', label: '梦幻紫', color: '#b388ff' },
+  { key: 'mint', label: '薄荷绿', color: '#7fd8c0' },
+  { key: 'sun', label: '暖阳橘', color: '#ffb35c' },
+  { key: 'blue', label: '静谧蓝', color: '#7ab8ff' }
+];
+
+// 时间线筛选状态（标签 / 日期）
+let timelineFilter = { tag: '', date: '' };
+
 // 每条动态待发送的评论图片（key=entryId）
 let pendingCommentImg = {};
 
@@ -64,12 +76,14 @@ function homeHtml(ctx) {
     avatarHtml(me, 'hero-avatar') +
     '<div class="hero-name">' + esc(me.nickname) + ' <span class="tag">' + ROLE_LABEL[me.role] + '</span></div>' +
     '<div class="hero-role">和' + pn + '在一起的第 ' + daysTogether(pair.anniversary).days + ' 天 🍀</div>' +
+    (pair.declaration ? '<div class="hero-decl">💌 “' + esc(pair.declaration) + '”</div>' : '') +
     '</div>' +
     '<div class="card"><div class="card-title">✍️ 今天想对' + pn + '说</div>' +
     '<textarea id="note-input" rows="2" maxlength="200" placeholder="写一句最想对 TA 说的话…（自动保存）">' + esc(myNote) + '</textarea>' +
     '<p class="muted small" style="margin-top:6px;">对方打开软件就能看到，实时同步 ✨</p></div>' +
     statusCard +
     noteCard +
+    missCardHtml(me, partner, pn) +
     '<div class="quick-grid">' +
     '<button class="quick-item" id="q-mood"><div class="quick-emoji">😊</div><div class="quick-label">记今日心情</div><div class="quick-desc">文字 + 表情</div></button>' +
     '<button class="quick-item" id="q-food"><div class="quick-emoji">🍜</div><div class="quick-label">记吃了啥</div><div class="quick-desc">文字 / 图片</div></button>' +
@@ -77,6 +91,20 @@ function homeHtml(ctx) {
     '<button class="quick-item" id="q-music"><div class="quick-emoji">🎵</div><div class="quick-label">一起听歌</div><div class="quick-desc">选一首我们都听到</div></button>' +
     '</div>' +
     anniversariesCardHtml(pair);
+}
+
+function missCardHtml(me, partner, pn) {
+  const today = todayKey();
+  const myMiss = me.missYou && me.missYou.date === today ? me.missYou.count : 0;
+  const pMiss = partner && partner.missYou && partner.missYou.date === today ? partner.missYou.count : 0;
+  return '<div class="card miss-card">' +
+    '<div class="card-title">💗 今日互动</div>' +
+    '<div class="miss-line">' + (pMiss > 0
+      ? '<span class="miss-from">' + esc(partner.nickname) + ' 今天想你了 <b>' + pMiss + '</b> 次</span>'
+      : '<span class="miss-from muted">' + pn + ' 今天还没说想我…</span>') + '</div>' +
+    '<button class="btn-primary miss-btn" id="miss-btn">' + (myMiss > 0 ? '想你了 💗 ×' + myMiss : '想你了 💗') + '</button>' +
+    '<p class="muted small" style="margin-top:8px;">点一下让 TA 知道你在想 TA，每天都能点 ✨</p>' +
+    '</div>';
 }
 
 function minsAgo(ts) {
@@ -105,6 +133,15 @@ function bindHome(ctx) {
   $('#q-food').onclick = () => foodModal(ctx);
   $('#q-status').onclick = () => statusModal(ctx);
   $('#q-music').onclick = () => ctx.go('music');
+  $('#miss-btn').onclick = async () => {
+    try {
+      const d = await api.missYou(pair.id, me.id);
+      ctx.apply(d.pair);
+      const b = $('#miss-btn');
+      b.classList.remove('miss-pop'); void b.offsetWidth; b.classList.add('miss-pop');
+      toast('已告诉 TA：想你了 💗');
+    } catch (e) { toast(e.message); }
+  };
   $('#anv-add').onclick = () => annivAddModal(ctx);
   $$('.anv-del').forEach((b) => {
     b.onclick = async () => {
@@ -167,35 +204,69 @@ function annivAddModal(ctx) {
 // ---------- 时间线 ----------
 function timelineHtml(ctx) {
   const { pair, me } = ctx.state;
-  const entries = pair.entries.slice().sort((a, b) => b.createdAt - a.createdAt);
+  let entries = pair.entries.slice().sort((a, b) => b.createdAt - a.createdAt);
+  const tagSet = [...new Set(pair.entries.map((e) => e.tag).filter(Boolean))];
+  if (timelineFilter.tag) entries = entries.filter((e) => e.tag === timelineFilter.tag);
+  if (timelineFilter.date) entries = entries.filter((e) => e.date === timelineFilter.date);
+
+  const filterBar = '<div class="tl-filters">' +
+    '<button class="tl-chip' + (timelineFilter.tag === '' ? ' on' : '') + '" data-tag="">全部</button>' +
+    tagSet.map((t) => '<button class="tl-chip' + (timelineFilter.tag === t ? ' on' : '') + '" data-tag="' + esc(t) + '">' + esc(t) + '</button>').join('') +
+    (timelineFilter.date ? '<button class="tl-chip on" data-clearday="1">📅 ' + esc(timelineFilter.date) + ' ✕</button>' : '') +
+    '</div>';
+
+  let body;
   if (!entries.length) {
-    return '<div class="empty"><span class="empty-emoji">📖</span>还没有记录哦<br/>记下今天的心情和好吃的吧～</div>';
-  }
-  const groups = {};
-  for (const e of entries) (groups[e.date] = groups[e.date] || []).push(e);
-  let html = '';
-  for (const date of Object.keys(groups).sort().reverse()) {
-    html += '<div class="day-group"><div class="day-label">' + esc(dayLabel(date)) + '</div>';
-    for (const e of groups[date]) {
-      const m = pair.members[e.memberId] || { nickname: '??', role: 'boy' };
-      const comments = Array.isArray(e.comments) ? e.comments : [];
-      html += '<div class="entry">' +
-        avatarHtml(m, 'entry-avatar') +
-        '<div class="entry-body">' +
-        '<div class="entry-head"><b>' + esc(m.nickname) + '</b>' +
-        (e.type === 'mood' ? '<span class="badge badge-b">心情</span>' : '<span class="badge badge-u">干饭</span>') +
-        '<span>' + fmtClock(e.createdAt) + '</span>' +
-        '<button class="entry-del" data-del="' + e.id + '" title="删除">✕</button>' +
-        '</div>' +
-        (e.emoji ? '<div class="entry-emoji">' + esc(e.emoji) + '</div>' : '') +
-        (e.text ? '<div class="entry-text">' + esc(e.text) + '</div>' : '') +
-        (e.image ? '<img class="entry-img viewable-img" data-src="' + e.image + '" src="' + e.image + '" alt="图片" />' : '') +
-        entryCommentsHtml(pair, me, e, comments) +
-        '</div></div>';
+    body = '<div class="empty"><span class="empty-emoji">' + (pair.entries.length ? '🔍' : '📖') + '</span>' +
+      (pair.entries.length ? '没有符合的记录哦<br/>换个标签或清掉日期筛选吧～' : '还没有记录哦<br/>记下今天的心情和好吃的吧～') + '</div>';
+  } else {
+    const groups = {};
+    for (const e of entries) (groups[e.date] = groups[e.date] || []).push(e);
+    body = '';
+    for (const date of Object.keys(groups).sort().reverse()) {
+      body += '<div class="day-group"><div class="day-label">' + esc(dayLabel(date)) + '</div>';
+      for (const e of groups[date]) {
+        const m = pair.members[e.memberId] || { nickname: '??', role: 'boy' };
+        const comments = Array.isArray(e.comments) ? e.comments : [];
+        body += '<div class="entry">' +
+          avatarHtml(m, 'entry-avatar') +
+          '<div class="entry-body">' +
+          '<div class="entry-head"><b>' + esc(m.nickname) + '</b>' +
+          (e.type === 'mood' ? '<span class="badge badge-b">心情</span>' : '<span class="badge badge-u">干饭</span>') +
+          (e.tag ? '<span class="badge badge-o">#' + esc(e.tag) + '</span>' : '') +
+          '<span>' + fmtClock(e.createdAt) + '</span>' +
+          '<button class="entry-del" data-del="' + e.id + '" title="删除">✕</button>' +
+          '</div>' +
+          (e.emoji ? '<div class="entry-emoji">' + esc(e.emoji) + '</div>' : '') +
+          (e.text ? '<div class="entry-text">' + esc(e.text) + '</div>' : '') +
+          (e.location ? '<div class="entry-loc">📍 ' + esc(e.location) + '</div>' : '') +
+          (e.image ? '<img class="entry-img viewable-img" data-src="' + e.image + '" src="' + e.image + '" alt="图片" />' : '') +
+          entryCommentsHtml(pair, me, e, comments) +
+          '</div></div>';
+      }
+      body += '</div>';
     }
-    html += '</div>';
   }
-  return html;
+  return filterBar + body + heatmapHtml(pair);
+}
+
+// GitHub 风格热力图：近 14 周每日活跃
+function heatmapHtml(pair) {
+  const counts = {};
+  for (const e of pair.entries) counts[e.date] = (counts[e.date] || 0) + 1;
+  const dayMs = 86400000;
+  const total = 98;
+  let cells = '';
+  for (let i = total - 1; i >= 0; i--) {
+    const d = new Date(Date.now() - i * dayMs);
+    const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const n = counts[key] || 0;
+    const lvl = n === 0 ? 0 : n >= 5 ? 4 : n >= 3 ? 3 : n >= 2 ? 2 : 1;
+    cells += '<button class="hm-cell lv' + lvl + '" data-day="' + key + '" title="' + key + (n ? ' · ' + n + ' 条' : '') + '"></button>';
+  }
+  return '<div class="heatmap"><div class="hm-title">📊 互动热力图（近 14 周）</div>' +
+    '<div class="hm-grid">' + cells + '</div>' +
+    '<div class="hm-legend"><span>少</span><i class="hm-cell lv1"></i><i class="hm-cell lv2"></i><i class="hm-cell lv3"></i><i class="hm-cell lv4"></i><span>多</span></div></div>';
 }
 
 function bindTimeline(ctx) {
@@ -217,6 +288,22 @@ function bindTimeline(ctx) {
   $('#view').prepend(bar);
   $('#tl-mood').onclick = () => moodModal(ctx);
   $('#tl-food').onclick = () => foodModal(ctx);
+
+  // 标签 / 日期筛选
+  $$('.tl-chip', view).forEach((b) => {
+    b.onclick = () => {
+      if (b.dataset.clearday) timelineFilter.date = '';
+      else if (b.dataset.tag !== undefined) { timelineFilter.tag = b.dataset.tag; timelineFilter.date = ''; }
+      ctx.go('timeline');
+    };
+  });
+  $$('.hm-cell', view).forEach((cell) => {
+    cell.onclick = () => {
+      const day = cell.dataset.day;
+      timelineFilter.date = (timelineFilter.date === day) ? '' : day;
+      ctx.go('timeline');
+    };
+  });
 
   // 评论：发送（文字 + 图片）
   $$('.comment-send', view).forEach((btn) => {
@@ -505,19 +592,34 @@ function profileHtml(ctx) {
     '<button class="btn-ghost" id="edit-profile" style="margin-top:8px;padding:6px 14px;font-size:12.5px;">编辑昵称 / 头像</button>' +
     '</div></div>' +
 
+    '<div class="card"><div class="card-title">📊 恋爱数据</div>' +
+    statsHtml(pair) +
+    '</div>' +
+
     '<div class="card">' +
     '<div class="card-title">💑 我们</div>' +
     '<div class="setting-row"><div><div class="setting-label">在一起纪念日</div><div class="setting-desc">从这天开始计算天数</div></div>' +
     '<input type="date" id="set-anniversary" value="' + esc(pair.anniversary) + '" style="width:150px;" /></div>' +
+    '<div class="setting-row"><div><div class="setting-label">空间装扮</div><div class="setting-desc">换一个主题色</div></div>' +
+    '<div class="theme-dots">' + THEME_LIST.map((t) => '<button class="theme-dot' + (pair.theme === t.key ? ' on' : '') + '" data-theme="' + t.key + '" style="background:' + t.color + ';" title="' + t.label + '"></button>').join('') + '</div></div>' +
     '<div class="setting-row"><div><div class="setting-label">小屋背景</div><div class="setting-desc">' + (isGirl ? '只有你（女方）能改哦' : '仅女方可更换') + '</div></div>' +
     '<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">' + bgNote + '</div></div>' +
     '<div class="setting-row"><div><div class="setting-label">邀请码</div><div class="setting-desc">对方用这个码加入</div></div>' +
     '<div style="display:flex;gap:6px;align-items:center;"><b style="letter-spacing:2px;">' + esc(pair.code) + '</b>' +
     '<button class="btn-ghost" id="copy-code" style="padding:5px 12px;font-size:12px;">复制</button></div></div>' +
+    '<div class="setting-row" style="flex-direction:column;align-items:stretch;"><div><div class="setting-label">爱情宣言</div><div class="setting-desc">写一句我们的话（首页展示）</div></div>' +
+    '<div style="display:flex;gap:8px;margin-top:8px;"><input id="declaration-input" maxlength="60" placeholder="例如：世界很大，只有我们。" value="' + esc(pair.declaration) + '" /><button class="btn-ghost" id="declaration-save" style="flex:none;">保存</button></div></div>' +
     '</div>' +
 
     '<div class="card">' +
+    '<div class="card-title">💌 时空胶囊</div>' +
+    capsulesHtml(pair) +
+    '<button class="btn-ghost" id="capsule-add" style="width:100%;margin-top:10px;">＋ 写一封给未来</button></div>' +
+
+    '<div class="card">' +
     '<div class="card-title">⚙️ 设置</div>' +
+    '<div class="setting-row"><div><div class="setting-label">数据备份</div><div class="setting-desc">把你们的回忆导出为文件</div></div>' +
+    '<button class="btn-ghost" id="export-data" style="padding:6px 12px;font-size:12px;">导出</button></div>' +
     '<div class="setting-row"><div><div class="setting-label">重新配对 / 退出</div><div class="setting-desc">清除本机数据，重新创建或加入</div></div>' +
     '<button class="btn-danger" id="reset-app">退出</button></div>' +
     '</div>' +
@@ -558,6 +660,35 @@ function bindProfile(ctx) {
     };
   }
 
+  $$('.theme-dot').forEach((b) => {
+    b.onclick = async () => {
+      try { const d = await api.setTheme(pair.id, me.id, b.dataset.theme); ctx.apply(d.pair); toast('主题已更换 🎨'); }
+      catch (e) { toast(e.message); }
+    };
+  });
+  $('#declaration-save').onclick = async () => {
+    const text = $('#declaration-input').value.trim();
+    try { const d = await api.setDeclaration(pair.id, me.id, text); ctx.apply(d.pair); toast('宣言已更新 💌'); }
+    catch (e) { toast(e.message); }
+  };
+  $('#capsule-add').onclick = () => capsuleAddModal(ctx);
+  $$('.capsule-del').forEach((b) => {
+    b.onclick = () => confirmModal('删除这封胶囊？', '删除后双方都看不到了。', async () => {
+      try { const d = await api.deleteCapsule(pair.id, me.id, b.dataset.capsule); ctx.apply(d.pair); }
+      catch (e) { toast(e.message); }
+    }, '删除');
+  });
+  $('#export-data').onclick = () => {
+    const d = new Date();
+    const key = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+    const blob = new Blob([JSON.stringify(pair, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'couple-home-backup-' + key + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(a.href);
+    toast('已导出备份文件 💾');
+  };
   $('#copy-code').onclick = () => {
     navigator.clipboard.writeText(pair.code).then(() => toast('邀请码已复制：' + pair.code)).catch(() => toast(pair.code));
   };
@@ -580,6 +711,70 @@ function bindProfile(ctx) {
       count = 0;
       eggMenuModal(ctx);
     }
+  };
+}
+
+// ---------- 数据统计 / 时空胶囊 ----------
+function statsHtml(pair) {
+  const entries = pair.entries;
+  const photos = entries.filter((e) => e.image).length;
+  const comments = entries.reduce((s, e) => s + (Array.isArray(e.comments) ? e.comments.length : 0), 0);
+  const done = pair.todos.filter((t) => t.done).length;
+  const days = daysTogether(pair.anniversary).days;
+  return '<div class="stats-grid">' +
+    statTile('⏱', days + ' 天', '在一起') +
+    statTile('📖', entries.length, '动态') +
+    statTile('🖼', photos, '照片') +
+    statTile('💬', comments, '评论') +
+    statTile('🎊', pair.anniversaries.length, '纪念日') +
+    statTile('✅', done, '完成清单') +
+    '</div>';
+}
+function statTile(icon, num, label) {
+  return '<div class="stat-tile"><div class="stat-num">' + icon + ' ' + num + '</div><div class="stat-label">' + label + '</div></div>';
+}
+
+function capsulesHtml(pair) {
+  const list = Array.isArray(pair.capsules) ? pair.capsules : [];
+  if (!list.length) return '<p class="muted small">写一封信给未来的 TA，时间到了才能打开 🔒</p>';
+  return '<div class="capsule-list">' + list.slice().sort((a, b) => (a.openDate < b.openDate ? -1 : 1)).map((x) => {
+    const locked = x.openDate > todayKey();
+    const days = annivDays(x.openDate);
+    return '<div class="capsule-item' + (locked ? ' locked' : ' open') + '">' +
+      '<div class="capsule-head"><span class="capsule-ico">' + (locked ? '🔒' : '💌') + '</span>' +
+      '<b>' + esc(x.title) + '</b>' +
+      '<span class="capsule-date">' + esc(x.openDate) + (locked ? ' · ' + days + ' 天后开启' : ' · 已开启') + '</span>' +
+      '<button class="capsule-del" data-capsule="' + esc(x.id) + '" title="删除">✕</button></div>' +
+      (locked
+        ? '<div class="capsule-locked muted">一封写给未来的信，还没到开启时间哦</div>'
+        : '<div class="capsule-content">' + esc(x.content).replace(/\n/g, '<br/>') + '</div>') +
+      '</div>';
+  }).join('') + '</div>';
+}
+
+function capsuleAddModal(ctx) {
+  const { pair, me } = ctx.state;
+  const defaultDate = new Date(Date.now() + 365 * 86400000);
+  const dstr = defaultDate.getFullYear() + '-' + String(defaultDate.getMonth() + 1).padStart(2, '0') + '-' + String(defaultDate.getDate()).padStart(2, '0');
+  const m = openModal(
+    '<h3>💌 写给未来</h3>' +
+    '<div class="field"><label>标题</label><input id="cap-title" maxlength="20" placeholder="给未来的一封信" /></div>' +
+    '<div class="field"><label>内容</label><textarea id="cap-content" rows="4" maxlength="1000" placeholder="想对未来的我们说什么…"></textarea></div>' +
+    '<div class="field"><label>开启日期（到这天双方才能看）</label><input type="date" id="cap-date" value="' + dstr + '" /></div>' +
+    '<div class="modal-actions"><button class="btn-ghost" id="cap-cancel">取消</button><button class="btn-primary" id="cap-ok">封存 💌</button></div>'
+  );
+  $('#cap-cancel').onclick = () => m.close();
+  $('#cap-ok').onclick = async () => {
+    const title = $('#cap-title').value.trim();
+    const content = $('#cap-content').value.trim();
+    const openDate = $('#cap-date').value;
+    if (!title) { toast('给胶囊起个标题吧'); return; }
+    if (!content) { toast('写点什么封进去吧'); return; }
+    if (!openDate) { toast('选一个开启日期'); return; }
+    try {
+      const d = await api.addCapsule(pair.id, me.id, title, content, openDate);
+      ctx.apply(d.pair); m.close(); toast('已封存，等时间开启 💌');
+    } catch (e) { toast(e.message); }
   };
 }
 
@@ -640,13 +835,21 @@ function tyrantComposeModal(ctx) {
 }
 
 // ---------- 弹窗 ----------
+function tagPickHtml(id) {
+  return '<div class="field"><label>标签（可选）</label><div class="tag-pick" id="' + id + '">' +
+    ENTRY_TAGS.map((t) => '<button data-tag="' + t + '">' + t + '</button>').join('') +
+    '</div></div>';
+}
+
 function moodModal(ctx) {
   const { pair, me } = ctx.state;
-  let sel = '', img = null;
+  let sel = '', img = null, tag = '';
   const m = openModal(
     '<h3>😊 今日心情</h3>' +
     '<div class="emoji-pick">' + MOODS.map((x) => '<button data-e="' + x[0] + '" title="' + x[1] + '">' + x[0] + '</button>').join('') + '</div>' +
     '<div class="field"><label>想说点什么（可选）</label><textarea id="mood-text" rows="2" maxlength="500" placeholder="今天的心情是…"></textarea></div>' +
+    tagPickHtml('mood-tags') +
+    '<div class="field"><label>地点（可选）</label><input id="mood-loc" maxlength="30" placeholder="在哪呢？" /></div>' +
     '<div class="field"><label>配图（可选）</label><input type="file" id="mood-file" accept="image/*" /></div>' +
     '<img class="img-preview" id="mood-prev" alt="预览" />' +
     '<div class="modal-actions"><button class="btn-ghost" id="mood-cancel">取消</button><button class="btn-primary" id="mood-ok">记下来 💗</button></div>'
@@ -655,6 +858,13 @@ function moodModal(ctx) {
     b.onclick = () => {
       $$('.emoji-pick button', m.root).forEach((x) => x.classList.remove('sel'));
       b.classList.add('sel'); sel = b.dataset.e;
+    };
+  });
+  $$('.tag-pick button', m.root).forEach((b) => {
+    b.onclick = () => {
+      if (b.classList.contains('on')) { b.classList.remove('on'); tag = ''; return; }
+      $$('.tag-pick button', m.root).forEach((x) => x.classList.remove('on'));
+      b.classList.add('on'); tag = b.dataset.tag;
     };
   });
   const prev = $('#mood-prev');
@@ -669,7 +879,7 @@ function moodModal(ctx) {
     const text = $('#mood-text').value.trim();
     if (!text && !sel && !img) { toast('至少填一点哦'); return; }
     try {
-      const d = await api.addEntry(pair.id, me.id, { type: 'mood', emoji: sel, text, image: img });
+      const d = await api.addEntry(pair.id, me.id, { type: 'mood', emoji: sel, text, image: img, tag, location: $('#mood-loc').value.trim() });
       ctx.apply(d.pair); m.close(); toast('心情已记录 😊');
     } catch (e) { toast(e.message); }
   };
@@ -677,14 +887,23 @@ function moodModal(ctx) {
 
 function foodModal(ctx) {
   const { pair, me } = ctx.state;
-  let img = null, emoji = '🍚';
+  let img = null, emoji = '🍚', tag = '';
   const m = openModal(
     '<h3>🍜 今天吃了啥</h3>' +
     '<div class="field"><label>吃了什么（可选）</label><textarea id="food-text" rows="2" maxlength="500" placeholder="比如：超好吃的火锅 🍲"></textarea></div>' +
+    tagPickHtml('food-tags') +
+    '<div class="field"><label>地点（可选）</label><input id="food-loc" maxlength="30" placeholder="在哪吃的？" /></div>' +
     '<div class="field"><label>照片（可选）</label><input type="file" id="food-file" accept="image/*" /></div>' +
     '<img class="img-preview" id="food-prev" alt="预览" />' +
     '<div class="modal-actions"><button class="btn-ghost" id="food-cancel">取消</button><button class="btn-primary" id="food-ok">记下来 🍽</button></div>'
   );
+  $$('.tag-pick button', m.root).forEach((b) => {
+    b.onclick = () => {
+      if (b.classList.contains('on')) { b.classList.remove('on'); tag = ''; return; }
+      $$('.tag-pick button', m.root).forEach((x) => x.classList.remove('on'));
+      b.classList.add('on'); tag = b.dataset.tag;
+    };
+  });
   const prev = $('#food-prev');
   $('#food-file').onchange = async (e) => {
     const f = e.target.files && e.target.files[0];
@@ -697,7 +916,7 @@ function foodModal(ctx) {
     const text = $('#food-text').value.trim();
     if (!text && !img) { toast('至少写点或传张图哦'); return; }
     try {
-      const d = await api.addEntry(pair.id, me.id, { type: 'food', emoji, text, image: img });
+      const d = await api.addEntry(pair.id, me.id, { type: 'food', emoji, text, image: img, tag, location: $('#food-loc').value.trim() });
       ctx.apply(d.pair); m.close(); toast('干饭记录 +1 🍜');
     } catch (e) { toast(e.message); }
   };

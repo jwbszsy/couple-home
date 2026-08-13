@@ -17,6 +17,42 @@ const state = {
   interacted: false
 };
 
+// 空间装扮：主题色（CSS 变量覆盖）
+const THEMES = {
+  pink:   { accent: '#ff8fab', deep: '#fb6f92', soft: '#ffe5ec', bg: '#fff0f3', rose: '#ffb3c6',
+            g1: 'rgba(255,143,171,.32)', g2: 'rgba(178,165,255,.30)', g3: 'rgba(255,209,102,.20)', g4: 'rgba(86,209,166,.20)',
+            b1: '#ffeaf1', b2: '#fdf3f7', b3: '#f6efff' },
+  purple: { accent: '#b388ff', deep: '#9c6bff', soft: '#ede7ff', bg: '#f6f1ff', rose: '#cdb8ff',
+            g1: 'rgba(179,136,255,.32)', g2: 'rgba(140,158,255,.30)', g3: 'rgba(255,209,102,.18)', g4: 'rgba(86,209,166,.18)',
+            b1: '#f1eaff', b2: '#faf6ff', b3: '#f3efff' },
+  mint:   { accent: '#7fd8c0', deep: '#3fb39a', soft: '#e0f7f0', bg: '#f0fbf7', rose: '#a5e3d2',
+            g1: 'rgba(127,216,192,.30)', g2: 'rgba(178,165,255,.22)', g3: 'rgba(255,209,102,.18)', g4: 'rgba(86,209,166,.24)',
+            b1: '#e9f8f2', b2: '#f4fcf9', b3: '#eefaf6' },
+  sun:    { accent: '#ffb35c', deep: '#ff9436', soft: '#fff0dc', bg: '#fff8ee', rose: '#ffc98f',
+            g1: 'rgba(255,179,92,.30)', g2: 'rgba(255,143,171,.22)', g3: 'rgba(255,209,102,.22)', g4: 'rgba(86,209,166,.16)',
+            b1: '#fff3e3', b2: '#fffaf2', b3: '#fff4e6' },
+  blue:   { accent: '#7ab8ff', deep: '#4f9bf5', soft: '#e3f0ff', bg: '#f1f7ff', rose: '#a9d2ff',
+            g1: 'rgba(122,184,255,.30)', g2: 'rgba(178,165,255,.24)', g3: 'rgba(255,209,102,.16)', g4: 'rgba(86,209,166,.16)',
+            b1: '#e8f3ff', b2: '#f5faff', b3: '#eef6ff' }
+};
+function applyTheme(theme) {
+  const t = THEMES[theme] || THEMES.pink;
+  const r = document.documentElement.style;
+  r.setProperty('--pink', t.accent);
+  r.setProperty('--pink-deep', t.deep);
+  r.setProperty('--pink-soft', t.soft);
+  r.setProperty('--pink-bg', t.bg);
+  r.setProperty('--rose', t.rose);
+  r.setProperty('--bg-g1', t.g1);
+  r.setProperty('--bg-g2', t.g2);
+  r.setProperty('--bg-g3', t.g3);
+  r.setProperty('--bg-g4', t.g4);
+  r.setProperty('--bg-base1', t.b1);
+  r.setProperty('--bg-base2', t.b2);
+  r.setProperty('--bg-base3', t.b3);
+  document.documentElement.dataset.theme = theme;
+}
+
 // 解析曲目对象（内置 / 上传 / 在线）
 function resolveMusicTrack(np) {
   if (!np) return null;
@@ -140,6 +176,7 @@ function apply(pair) {
   state.pair = pair;
   state.me = pair.members[localMemberId()] || null;
   state.partner = Object.values(pair.members).find((m) => m.id !== (state.me && state.me.id)) || null;
+  applyTheme(pair.theme);
   applyBackground();
   updateTimer();
   syncMusic();

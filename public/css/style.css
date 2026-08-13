@@ -607,3 +607,91 @@ input:focus, textarea:focus {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+/* ============================================================
+   ✨ 功能皮肤：想你了打卡 / 时间线标签+热力图 / 数据统计 / 主题装扮 / 时空胶囊
+   ============================================================ */
+:root {
+  --bg-g1: rgba(255,143,171,.32); --bg-g2: rgba(178,165,255,.30);
+  --bg-g3: rgba(255,209,102,.20); --bg-g4: rgba(86,209,166,.20);
+  --bg-base1: #ffeaf1; --bg-base2: #fdf3f7; --bg-base3: #f6efff;
+}
+body, #bg {
+  background:
+    radial-gradient(38vmax 38vmax at 12% 8%, var(--bg-g1), transparent 60%),
+    radial-gradient(34vmax 34vmax at 88% 12%, var(--bg-g2), transparent 60%),
+    radial-gradient(36vmax 36vmax at 82% 88%, var(--bg-g3), transparent 60%),
+    radial-gradient(32vmax 32vmax at 10% 90%, var(--bg-g4), transparent 60%),
+    linear-gradient(165deg, var(--bg-base1) 0%, var(--bg-base2) 42%, var(--bg-base3) 100%);
+}
+
+/* 想你了打卡 */
+.miss-card { text-align: center; }
+.miss-line { font-size: 14px; margin-bottom: 12px; }
+.miss-from b { color: var(--pink-deep); font-size: 16px; }
+.miss-btn { max-width: 260px; margin: 0 auto; display: block; }
+.miss-btn.miss-pop { animation: missPop .5s cubic-bezier(.2,.9,.3,1.4); }
+@keyframes missPop { 0% { transform: scale(1); } 35% { transform: scale(1.12); } 70% { transform: scale(.96); } 100% { transform: scale(1); } }
+
+/* 爱情宣言 */
+.hero-decl { margin-top: 10px; font-size: 13.5px; color: var(--text-soft); font-style: italic; }
+
+/* 时间线筛选 + 热力图 */
+.tl-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.tl-chip {
+  border: 1.5px solid rgba(255,179,198,.5); background: rgba(255,255,255,.8); color: var(--text-soft);
+  border-radius: 999px; padding: 6px 14px; font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit;
+  transition: .15s;
+}
+.tl-chip.on { background: linear-gradient(135deg, var(--pink), var(--pink-deep)); color: #fff; border-color: transparent; }
+.tl-chip:active { transform: scale(.94); }
+.entry-loc { font-size: 12px; color: var(--text-soft); margin-top: 4px; }
+.heatmap { margin-top: 6px; }
+.heatmap .hm-title { font-size: 13px; font-weight: 800; margin-bottom: 10px; }
+.hm-grid { display: grid; grid-template-columns: repeat(14, 1fr); gap: 4px; }
+.hm-cell { border: 0; border-radius: 5px; aspect-ratio: 1; cursor: pointer; padding: 0; background: rgba(255,179,198,.22); transition: transform .12s; }
+.hm-cell:active { transform: scale(.8); }
+.hm-cell.lv1 { background: rgba(251,111,146,.28); }
+.hm-cell.lv2 { background: rgba(251,111,146,.55); }
+.hm-cell.lv3 { background: rgba(251,111,146,.78); }
+.hm-cell.lv4 { background: linear-gradient(135deg, var(--pink-deep), #c2185b); }
+.hm-legend { display: flex; align-items: center; gap: 6px; justify-content: flex-end; margin-top: 10px; font-size: 11px; color: var(--text-soft); }
+.hm-legend .hm-cell { width: 14px; height: 14px; border-radius: 4px; aspect-ratio: auto; cursor: default; }
+
+/* 标签选择 */
+.tag-pick { display: flex; flex-wrap: wrap; gap: 8px; }
+.tag-pick button {
+  border: 1.5px solid rgba(255,179,198,.5); background: #fff; color: var(--text-soft);
+  border-radius: 999px; padding: 7px 14px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; transition: .15s;
+}
+.tag-pick button.on { background: linear-gradient(135deg, var(--pink), var(--pink-deep)); color: #fff; border-color: transparent; }
+
+/* 数据统计 */
+.stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.stat-tile {
+  background: linear-gradient(145deg, rgba(255,255,255,.9), var(--pink-soft));
+  border: 1px solid rgba(255,255,255,.9); border-radius: 16px; padding: 12px 6px; text-align: center;
+  box-shadow: 0 6px 16px rgba(251,111,146,.1);
+}
+.stat-num { font-size: 16px; font-weight: 800; color: var(--pink-deep); }
+.stat-label { font-size: 11.5px; color: var(--text-soft); margin-top: 3px; }
+
+/* 主题装扮 */
+.theme-dots { display: flex; gap: 8px; }
+.theme-dot { width: 30px; height: 30px; border-radius: 50%; border: 3px solid #fff; cursor: pointer; box-shadow: 0 3px 10px rgba(91,58,68,.2); transition: transform .15s; }
+.theme-dot.on { transform: scale(1.15); box-shadow: 0 0 0 2px var(--pink-deep), 0 3px 10px rgba(91,58,68,.25); }
+.theme-dot:active { transform: scale(.9); }
+
+/* 时空胶囊 */
+.capsule-list { display: flex; flex-direction: column; gap: 9px; }
+.capsule-item {
+  background: linear-gradient(145deg, rgba(255,255,255,.92), var(--pink-soft));
+  border: 1px solid rgba(255,255,255,.95); border-radius: 16px; padding: 12px 14px;
+  box-shadow: 0 6px 16px rgba(251,111,146,.1);
+}
+.capsule-item.locked { background: linear-gradient(145deg, rgba(255,255,255,.92), rgba(255,255,255,.6)); }
+.capsule-head { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.capsule-head b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.capsule-date { font-size: 11.5px; color: var(--text-soft); white-space: nowrap; }
+.capsule-del { border: 0; background: none; color: #d7b7bf; cursor: pointer; font-size: 14px; padding: 2px; }
+.capsule-locked { font-size: 12px; margin-top: 6px; }
+.capsule-content { font-size: 13.5px; line-height: 1.65; margin-top: 8px; white-space: pre-wrap; word-break: break-word; }

@@ -98,8 +98,16 @@ function normalizePair(pair) {
   if (!pair.music) pair.music = { tracks: [], nowPlaying: null };
   if (!pair.music.tracks) pair.music.tracks = [];
   if (!Array.isArray(pair.entries)) pair.entries = [];
-  for (const e of pair.entries) { if (!Array.isArray(e.comments)) e.comments = []; }
   if (!Array.isArray(pair.anniversaries)) pair.anniversaries = [];
+  if (!pair.theme) pair.theme = 'pink';
+  if (!pair.declaration) pair.declaration = '';
+  if (!Array.isArray(pair.capsules)) pair.capsules = [];
+  for (const m of Object.values(pair.members || {})) { if (!m.missYou) m.missYou = null; }
+  for (const e of pair.entries) {
+    if (!Array.isArray(e.comments)) e.comments = [];
+    if (!e.tag) e.tag = null;
+    if (!e.location) e.location = null;
+  }
   return pair;
 }
 
@@ -145,6 +153,7 @@ function newMember(pairId, nickname, role) {
     avatar: null,
     status: null,     // { type:'app'|'manual', name, packageName, ts }
     todayNote: null,  // { date, text, updatedAt }
+    missYou: null,    // { date, count }
     createdAt: Date.now()
   };
   db.pairs[pairId].members[memberId] = member;
@@ -162,7 +171,10 @@ function newPair(nickname, role) {
     entries: [],      // { id, memberId, type:'mood'|'food', text, emoji, image, date, createdAt }
     todos: [],        // { id, text, done, createdBy, createdAt, doneAt }
     music: { tracks: [], nowPlaying: null }, // tracks: { id, title, dataUrl, addedBy, addedAt }
-    anniversaries: [] // { id, title, date, createdBy, createdAt }
+    anniversaries: [], // { id, title, date, createdBy, createdAt }
+    theme: 'pink',
+    declaration: '',
+    capsules: []       // { id, title, content, openDate, fromMemberId, createdAt }
   };
   db.pairs[pairId] = pair;
   newMember(pairId, nickname, role);
@@ -295,8 +307,10 @@ function routeApi(method, p, body, res) {
     let image = null;
     if (body.image) { assertSize(body.image, MAX_IMAGE_BYTES); image = body.image; }
     if (!text && !emoji && !image) return fail(res, 400, '至少填写一点内容哦');
+    const tag = String(body.tag || '').trim().slice(0, 10) || null;
+    const location = String(body.location || '').trim().slice(0, 30) || null;
     pair.entries.push({
-      id: uid('e'), memberId, type, text, emoji, image, comments: [],
+      id: uid('e'), memberId, type, text, emoji, image, comments: [], tag, location,
       date: String(body.date || todayStr()), createdAt: Date.now()
     });
     changed();
@@ -374,6 +388,42 @@ function routeApi(method, p, body, res) {
     const text = String(body.text || '').trim().slice(0, 40);
     pair.tyrant = { id: uid('t'), text, fromMemberId: memberId, ts: Date.now() };
     changed();
+    return ok(res, { pair, memberId });
+  }
+  if (method === 'POST' && p === '/api/miss') {
+    const today = todayStr();
+    const mine = member.missYou || { date: '', count: 0 };
+    member.missYou = (mine.date === today) ? { date: today, count: mine.count + 1 } : { date: today, count: 1 };
+    changed();
+    return ok(res, { pair, memberId });
+  }
+  if (method === 'POST' && p === '/api/theme') {
+    const theme = String(body.theme || '');
+    if (!['pink', 'purple', 'mint', 'sun', 'blue'].includes(theme)) return fail(res, 400, '主题不存在');
+    pair.theme = theme;
+    changed();
+    return ok(res, { pair, memberId });
+  }
+  if (method === 'POST' && p === '/api/declaration') {
+    pair.declaration = String(body.text || '').trim().slice(0, 60);
+    changed();
+    return ok(res, { pair, memberId });
+  }
+  if (method === 'POST' && p === '/api/capsule/add') {
+    const title = String(body.title || '').trim().slice(0, 20);
+    const content = String(body.content || '').trim().slice(0, 1000);
+    const openDate = String(body.openDate || '');
+    if (!title) return fail(res, 400, '给胶囊起个标题吧');
+    if (!content) return fail(res, 400, '写点什么封进去吧');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(openDate)) return fail(res, 400, '开启日期格式应为 YYYY-MM-DD');
+    pair.capsules.push({ id: uid('c'), title, content, openDate, fromMemberId: memberId, createdAt: Date.now() });
+    changed();
+    return ok(res, { pair, memberId });
+  }
+  if (method === 'POST' && p === '/api/capsule/delete') {
+    const capsuleId = String(body.capsuleId || '');
+    const i = pair.capsules.findIndex((x) => x.id === capsuleId);
+    if (i >= 0) { pair.capsules.splice(i, 1); changed(); }
     return ok(res, { pair, memberId });
   }
 
