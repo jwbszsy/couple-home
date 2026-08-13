@@ -1,0 +1,76 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#ff8fab" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <title>我们的小屋</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-180.png" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="bg"></div>
+
+  <div id="app">
+    <header class="topbar">
+      <div class="brand"><span class="brand-heart">❤</span> 我们的小屋</div>
+      <div id="timer-chip" class="timer-chip" title="在一起的天数">💕 --</div>
+    </header>
+
+    <main id="view" class="view"></main>
+
+    <nav class="bottom-nav" id="bottom-nav">
+      <button class="nav-btn active" data-view="home"><span class="nav-ico">🏠</span><span class="nav-txt">首页</span></button>
+      <button class="nav-btn" data-view="timeline"><span class="nav-ico">📖</span><span class="nav-txt">时间线</span></button>
+      <button class="nav-btn" data-view="todo"><span class="nav-ico">✅</span><span class="nav-txt">清单</span></button>
+      <button class="nav-btn" data-view="music"><span class="nav-ico">🎵</span><span class="nav-txt">音乐</span></button>
+      <button class="nav-btn" data-view="profile"><span class="nav-ico">👤</span><span class="nav-txt">我的</span></button>
+    </nav>
+
+    <div id="musicbar" class="musicbar hidden">
+      <button id="mb-play" class="mb-btn" aria-label="播放/暂停">▶</button>
+      <div class="mb-info">
+        <div id="mb-title" class="mb-title">--</div>
+        <div id="mb-sub" class="mb-sub">--</div>
+      </div>
+      <button id="mb-open" class="mb-btn" aria-label="打开音乐页">🎵</button>
+    </div>
+  </div>
+
+  <!-- 首次进入：配对 -->
+  <div id="onboard" class="overlay hidden">
+    <div class="card onboard-card">
+      <div class="onboard-logo">🏠</div>
+      <h1>我们的小屋</h1>
+      <p class="muted">只有我们两个人的小天地 💕</p>
+
+      <div class="seg" id="onboard-seg">
+        <button class="seg-btn active" data-mode="create">创建小屋</button>
+        <button class="seg-btn" data-mode="join">加入小屋</button>
+      </div>
+
+      <form id="onboard-form" class="onboard-form">
+        <div id="join-code-wrap" class="field hidden">
+          <label>对方给你的邀请码</label>
+          <input id="join-code" maxlength="8" placeholder="例如 A3F9KQ7X" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label>我的昵称（对方会看到）</label>
+          <input id="join-nickname" maxlength="20" placeholder="怎么称呼你？" required />
+        </div>
+        <button type="submit" class="btn-primary" id="onboard-submit">开始 💗</button>
+        <p id="onboard-err" class="err hidden"></p>
+      </form>
+      <p class="muted small">创建 = 男方 🧑 ｜ 加入 = 女方 👩（角色可在“我的”里调整）</p>
+    </div>
+  </div>
+
+  <div id="modal-root"></div>
+  <div id="toast-root"></div>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

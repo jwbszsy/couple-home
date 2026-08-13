@@ -1,0 +1,8 @@
+{
+	"appId": "com.couplehome.app",
+	"appName": "我们的小屋",
+	"webDir": "../public",
+	"android": {
+		"allowMixedContent": false
+	}
+}
