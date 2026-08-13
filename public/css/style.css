@@ -695,3 +695,35 @@ body, #bg {
 .capsule-del { border: 0; background: none; color: #d7b7bf; cursor: pointer; font-size: 14px; padding: 2px; }
 .capsule-locked { font-size: 12px; margin-top: 6px; }
 .capsule-content { font-size: 13.5px; line-height: 1.65; margin-top: 8px; white-space: pre-wrap; word-break: break-word; }
+/* ============================================================
+   ✨ 切页动画门控 / 热力图置顶 / 连续互动 / 本周小报
+   ============================================================ */
+/* 入场动画只在切换页面（#view.anim-in）时播放，数据同步渲染不重播，避免卡片反复跳动/重叠 */
+.view > .card, .view .quick-item { animation: none; }
+.view.anim-in > .card { animation: cardIn .45s cubic-bezier(.2,.8,.3,1) both; }
+.view.anim-in > .card:nth-child(2) { animation-delay: .04s; }
+.view.anim-in > .card:nth-child(3) { animation-delay: .08s; }
+.view.anim-in > .card:nth-child(4) { animation-delay: .12s; }
+.view.anim-in > .card:nth-child(5) { animation-delay: .16s; }
+.view.anim-in > .card:nth-child(n+6) { animation-delay: .2s; }
+.view.anim-in .quick-item { animation: cardIn .45s cubic-bezier(.2,.8,.3,1) both; }
+.view.anim-in .quick-item:nth-child(1) { animation-delay: .08s; }
+.view.anim-in .quick-item:nth-child(2) { animation-delay: .12s; }
+.view.anim-in .quick-item:nth-child(3) { animation-delay: .16s; }
+.view.anim-in .quick-item:nth-child(4) { animation-delay: .2s; }
+
+/* 卡片毛玻璃降档（降低移动端多卡叠层的渲染毛刺） */
+.card { -webkit-backdrop-filter: blur(12px) saturate(1.4); backdrop-filter: blur(12px) saturate(1.4); }
+
+/* 热力图卡片 + 汇总 */
+.heatmap-card { background: linear-gradient(135deg, rgba(255,255,255,.82), rgba(255,229,236,.7)); }
+.hm-summary { font-size: 12.5px; color: var(--text-soft); margin-bottom: 12px; }
+.hm-summary b { color: var(--pink-deep); }
+
+/* 连续互动 */
+.miss-streak { font-size: 12.5px; font-weight: 700; color: var(--pink-deep); margin-bottom: 10px; }
+.miss-streak.muted { color: var(--text-soft); font-weight: 600; }
+
+/* 本周小报 */
+.weekly-card { background: linear-gradient(135deg, rgba(255,255,255,.85), rgba(255,229,236,.7)); }
+.weekly-line { font-size: 14px; line-height: 1.7; }

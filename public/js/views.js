@@ -30,6 +30,9 @@ let timelineFilter = { tag: '', date: '' };
 // 每条动态待发送的评论图片（key=entryId）
 let pendingCommentImg = {};
 
+// 记录上一次渲染的页面：只有切换页面时才播放入场动画（避免数据同步导致卡片反复跳动/重叠）
+let lastView = null;
+
 export function render(view, ctx) {
   const state = ctx.state;
   if (!state.pair || !state.me) {
@@ -37,8 +40,12 @@ export function render(view, ctx) {
     $$('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
     return;
   }
+  const switched = lastView !== view;
+  lastView = view;
+  const v = $('#view');
+  v.classList.toggle('anim-in', switched);
   const html = VIEWS[view] ? VIEWS[view](ctx) : '<div class="empty">页面不存在</div>';
-  $('#view').innerHTML = html;
+  v.innerHTML = html;
   $$('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
   if (BIND[view]) BIND[view](ctx);
 }
@@ -83,7 +90,8 @@ function homeHtml(ctx) {
     '<p class="muted small" style="margin-top:6px;">对方打开软件就能看到，实时同步 ✨</p></div>' +
     statusCard +
     noteCard +
-    missCardHtml(me, partner, pn) +
+    missCardHtml(pair, me, partner, pn) +
+    weeklyReportHtml(pair) +
     '<div class="quick-grid">' +
     '<button class="quick-item" id="q-mood"><div class="quick-emoji">😊</div><div class="quick-label">记今日心情</div><div class="quick-desc">文字 + 表情</div></button>' +
     '<button class="quick-item" id="q-food"><div class="quick-emoji">🍜</div><div class="quick-label">记吃了啥</div><div class="quick-desc">文字 / 图片</div></button>' +
@@ -93,17 +101,77 @@ function homeHtml(ctx) {
     anniversariesCardHtml(pair);
 }
 
-function missCardHtml(me, partner, pn) {
+function missCardHtml(pair, me, partner, pn) {
   const today = todayKey();
   const myMiss = me.missYou && me.missYou.date === today ? me.missYou.count : 0;
   const pMiss = partner && partner.missYou && partner.missYou.date === today ? partner.missYou.count : 0;
   return '<div class="card miss-card">' +
     '<div class="card-title">💗 今日互动</div>' +
+    streakHtml(pair) +
     '<div class="miss-line">' + (pMiss > 0
       ? '<span class="miss-from">' + esc(partner.nickname) + ' 今天想你了 <b>' + pMiss + '</b> 次</span>'
       : '<span class="miss-from muted">' + pn + ' 今天还没说想我…</span>') + '</div>' +
     '<button class="btn-primary miss-btn" id="miss-btn">' + (myMiss > 0 ? '想你了 💗 ×' + myMiss : '想你了 💗') + '</button>' +
     '<p class="muted small" style="margin-top:8px;">点一下让 TA 知道你在想 TA，每天都能点 ✨</p>' +
+    '</div>';
+}
+
+function streakHtml(pair) {
+  const st = currentStreak(pair);
+  if (st.days > 0) {
+    return '<div class="miss-streak">🔥 已连续互动 <b>' + st.days + '</b> 天' + (st.todayActive ? '' : '，今天还没互动哦') + '</div>';
+  }
+  return '<div class="miss-streak muted">🔥 今天还没互动，点下面按钮开启连续天数吧</div>';
+}
+
+function dateKey(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+// 互动日：当天有动态 / 有待办完成 / 有想你了打卡
+function interactDays(pair) {
+  const act = new Set();
+  for (const e of pair.entries) act.add(e.date);
+  for (const t of pair.todos) if (t.done && t.doneAt) act.add(dateKey(new Date(t.doneAt)));
+  for (const m of Object.values(pair.members || {})) if (m.missYou && m.missYou.date) act.add(m.missYou.date);
+  return act;
+}
+
+// 连续互动天数：今天没互动时从昨天开始算（今天算“待定”）
+function currentStreak(pair) {
+  const act = interactDays(pair);
+  const today = dateKey(new Date());
+  const todayActive = act.has(today);
+  const start = new Date();
+  if (!todayActive) start.setDate(start.getDate() - 1);
+  let days = 0;
+  const d = new Date(start);
+  for (let i = 0; i < 10000; i++) {
+    if (!act.has(dateKey(d))) break;
+    days++;
+    d.setDate(d.getDate() - 1);
+  }
+  return { days, todayActive };
+}
+
+// 本周小报：近 7 天
+function weeklyReportHtml(pair) {
+  const cutoff = Date.now() - 7 * 86400000;
+  const es = pair.entries.filter((e) => e.createdAt >= cutoff);
+  const photos = es.filter((e) => e.image).length;
+  const comments = es.reduce((s, e) => s + (Array.isArray(e.comments) ? e.comments.length : 0), 0);
+  const done = pair.todos.filter((t) => t.done && t.doneAt && t.doneAt >= cutoff).length;
+  const st = currentStreak(pair);
+  const parts = [];
+  if (es.length) parts.push(es.length + ' 条动态');
+  if (photos) parts.push(photos + ' 张照片');
+  if (comments) parts.push(comments + ' 条评论');
+  if (done) parts.push('完成 ' + done + ' 件小事');
+  if (!parts.length) parts.push('还没有留下记录');
+  return '<div class="card weekly-card">' +
+    '<div class="card-title">📰 本周小报</div>' +
+    '<div class="weekly-line">' + parts.join(' · ') + (st.days ? ' · 🔥 连续 ' + st.days + ' 天' : '') + '</div>' +
+    '<p class="muted small" style="margin-top:6px;">下一周也要一起创造回忆呀 ✨</p>' +
     '</div>';
 }
 
@@ -247,26 +315,35 @@ function timelineHtml(ctx) {
       body += '</div>';
     }
   }
-  return filterBar + body + heatmapHtml(pair);
+  return filterBar + heatmapHtml(pair) + body;
 }
 
-// GitHub 风格热力图：近 14 周每日活跃
+// GitHub 风格热力图：近 14 周每日互动（动态 / 待办完成 / 想你了）
 function heatmapHtml(pair) {
   const counts = {};
   for (const e of pair.entries) counts[e.date] = (counts[e.date] || 0) + 1;
+  for (const t of pair.todos) if (t.done && t.doneAt) { const k = dateKey(new Date(t.doneAt)); counts[k] = (counts[k] || 0) + 1; }
+  for (const m of Object.values(pair.members || {})) if (m.missYou && m.missYou.date) counts[m.missYou.date] = (counts[m.missYou.date] || 0) + (m.missYou.count || 1);
   const dayMs = 86400000;
   const total = 98;
   let cells = '';
+  let active = 0;
   for (let i = total - 1; i >= 0; i--) {
     const d = new Date(Date.now() - i * dayMs);
-    const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const key = dateKey(d);
     const n = counts[key] || 0;
+    if (n > 0) active++;
     const lvl = n === 0 ? 0 : n >= 5 ? 4 : n >= 3 ? 3 : n >= 2 ? 2 : 1;
-    cells += '<button class="hm-cell lv' + lvl + '" data-day="' + key + '" title="' + key + (n ? ' · ' + n + ' 条' : '') + '"></button>';
+    cells += '<button class="hm-cell lv' + lvl + '" data-day="' + key + '" title="' + key + (n ? ' · ' + n + ' 次互动' : '') + '"></button>';
   }
-  return '<div class="heatmap"><div class="hm-title">📊 互动热力图（近 14 周）</div>' +
+  const st = currentStreak(pair);
+  return '<div class="card heatmap-card">' +
+    '<div class="card-title">📊 互动热力图 · 近 14 周</div>' +
+    '<div class="hm-summary">近 14 周你们有 <b>' + active + '</b> 天留下过互动' + (st.days ? ' · 🔥 连续互动 <b>' + st.days + '</b> 天' : '') + '</div>' +
     '<div class="hm-grid">' + cells + '</div>' +
-    '<div class="hm-legend"><span>少</span><i class="hm-cell lv1"></i><i class="hm-cell lv2"></i><i class="hm-cell lv3"></i><i class="hm-cell lv4"></i><span>多</span></div></div>';
+    '<div class="hm-legend"><span>少</span><i class="hm-cell lv1"></i><i class="hm-cell lv2"></i><i class="hm-cell lv3"></i><i class="hm-cell lv4"></i><span>多</span></div>' +
+    '<p class="muted small" style="margin-top:8px;">点某个小格子可只看那一天的记录，再点一下取消。</p>' +
+    '</div>';
 }
 
 function bindTimeline(ctx) {
