@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bgG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFB3C6"/>
+      <stop offset="0.55" stop-color="#FF8FAB"/>
+      <stop offset="1" stop-color="#FB5E8C"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.32" cy="0.22" r="0.75">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.55"/>
+      <stop offset="0.55" stop-color="#FFFFFF" stop-opacity="0.10"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="roofG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FF7096"/>
+      <stop offset="1" stop-color="#F83872"/>
+    </linearGradient>
+    <filter id="drop" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#9E1B4E" flood-opacity="0.30"/>
+    </filter>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#F83872" flood-opacity="0.30"/>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" rx="230" fill="url(#bgG)"/>
+  <rect width="1024" height="1024" rx="230" fill="url(#glow)"/>
+
+  <ellipse cx="512" cy="846" rx="256" ry="34" fill="#9E1B4E" opacity="0.24"/>
+
+  <g filter="url(#drop)">
+    <path d="M512 236 C 404 330 330 436 326 508 L 698 508 C 694 436 620 330 512 236 Z" fill="url(#roofG)"/>
+    <rect x="316" y="488" width="392" height="314" rx="54" fill="#FFFFFF"/>
+  </g>
+
+  <path d="M512 262 C 450 332 412 408 408 470 L 512 470 Z" fill="#FFFFFF" opacity="0.30"/>
+
+  <path d="M512 372 C 488 352 462 368 462 392 C 462 414 486 434 512 452 C 538 434 562 414 562 392 C 562 368 536 352 512 372 Z" fill="#FFFFFF" opacity="0.92"/>
+
+  <path d="M462 802 L 462 716 A 50 50 0 0 1 562 716 L 562 802 Z" fill="url(#roofG)" filter="url(#soft)"/>
+  <circle cx="536" cy="756" r="9" fill="#FFFFFF"/>
+
+  <path d="M392 742 C 376 730 366 742 366 758 C 366 774 386 788 392 800 C 398 788 418 774 418 758 C 418 742 408 730 392 742 Z" fill="#FF8FAB" opacity="0.85"/>
+  <path d="M632 742 C 616 730 606 742 606 758 C 606 774 626 788 632 800 C 638 788 658 774 658 758 C 658 742 648 730 632 742 Z" fill="#FF8FAB" opacity="0.85"/>
+</svg>
