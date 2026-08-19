@@ -482,6 +482,14 @@ function routeApi(method, p, body, res) {
     }).reverse();
     return ok(res, { messages });
   }
+  if (method === 'POST' && p === '/api/admin/pair/delete') {
+    if (!adminTokenOk(body.token)) return fail(res, 403, '请先登录');
+    const pair = db.pairs[body.pairId];
+    if (!pair) return fail(res, 404, '小屋不存在');
+    delete db.pairs[body.pairId];
+    save();
+    return ok(res, { pairId: body.pairId });
+  }
   if (method === 'POST' && p === '/api/admin/flagged') {
     if (!adminTokenOk(body.token)) return fail(res, 403, '请先登录');
     const flagged = (stats.flagged || []).slice().reverse().map((x) => ({

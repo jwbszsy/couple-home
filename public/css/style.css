@@ -1,4 +1,4 @@
-﻿/* ============ 我们的小屋 · 暖甜主题 ============ */
+/* ============ 我们的小屋 · 暖甜主题 ============ */
 :root {
   --pink: #ff8fab;
   --pink-deep: #fb6f92;
@@ -787,7 +787,7 @@ body, #bg {
 .chat-input-bar {
   position: fixed; z-index: 25;
   left: 50%; transform: translateX(-50%);
-  bottom: calc(72px + env(safe-area-inset-bottom));
+  bottom: calc(64px + env(safe-area-inset-bottom));
   width: 100%; max-width: 480px;
   padding: 10px 14px 12px;
   background: linear-gradient(180deg, rgba(255,240,243,0) 0%, rgba(255,240,243,.96) 26%);

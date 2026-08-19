@@ -1189,6 +1189,10 @@ async function bindChat(ctx) {
 
   const input = $('#chat-text');
   input.value = chatInputKeep;
+  // 严丝合缝：用底部导航的真实高度贴齐输入栏
+  const inputBar = document.querySelector('.chat-input-bar');
+  const navEl = document.querySelector('.bottom-nav');
+  if (inputBar && navEl) inputBar.style.bottom = navEl.offsetHeight + 'px';
   let emojiPanel = null;
   const closeEmoji = () => { if (emojiPanel) { emojiPanel.remove(); emojiPanel = null; } };
   input.addEventListener('input', () => { chatInputKeep = input.value; closeEmoji(); });
