@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "couple-home",
   "version": "0.1.0",
   "private": true,
@@ -9,5 +9,10 @@
     "icons": "node scripts/gen-icons.js",
     "test": "node scripts/smoke.js"
   },
-  "engines": { "node": ">=18" }
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "web-push": "^3.6.7"
+  }
 }

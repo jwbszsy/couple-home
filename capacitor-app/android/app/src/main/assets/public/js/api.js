@@ -19,7 +19,7 @@ async function post(path, body) {
   return j.data;
 }
 
-export function createPair(nickname) { return post('/api/pair/create', { nickname }); }
+export function createPair(nickname, activationCode) { return post('/api/pair/create', { nickname, activationCode }); }
 export function joinPair(code, nickname) { return post('/api/pair/join', { code, nickname }); }
 export function restoreByCode(code, role) { return post('/api/restore', { code, role }); }
 export function syncState(pairId, memberId) { return post('/api/sync', { pairId, memberId }); }
@@ -38,6 +38,12 @@ export function setAnniversary(pairId, memberId, date) { return post('/api/anniv
 export function addAnniversary(pairId, memberId, title, date) { return post('/api/anniversary/add', { pairId, memberId, title, date }); }
 export function removeAnniversary(pairId, memberId, annivId) { return post('/api/anniversary/remove', { pairId, memberId, annivId }); }
 export function sendTyrant(pairId, memberId, text) { return post('/api/tyrant', { pairId, memberId, text }); }
+export function getVapidKey() { return post('/api/push/vapid-key', {}); }
+export function subscribePush(pairId, memberId, subscription) { return post('/api/push/subscribe', { pairId, memberId, subscription }); }
+export function adminLogin(password) { return post('/api/admin/login', { password }); }
+export function adminStats(token) { return post('/api/admin/stats', { token }); }
+export function adminGenerate(token, count) { return post('/api/admin/codes/generate', { token, count }); }
+export function adminExport(token) { return post('/api/admin/codes/export', { token }); }
 export function missYou(pairId, memberId) { return post('/api/miss', { pairId, memberId }); }
 export function setTheme(pairId, memberId, theme) { return post('/api/theme', { pairId, memberId, theme }); }
 export function setDeclaration(pairId, memberId, text) { return post('/api/declaration', { pairId, memberId, text }); }

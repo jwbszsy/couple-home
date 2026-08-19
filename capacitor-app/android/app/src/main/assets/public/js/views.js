@@ -309,6 +309,7 @@ function timelineHtml(ctx) {
           (e.text ? '<div class="entry-text">' + esc(e.text) + '</div>' : '') +
           (e.location ? '<div class="entry-loc">📍 ' + esc(e.location) + '</div>' : '') +
           (e.image ? '<img class="entry-img viewable-img" data-src="' + e.image + '" src="' + e.image + '" alt="图片" />' : '') +
+          (e.voice ? '<audio class="voice-player" controls preload="metadata" src="' + e.voice + '"></audio>' : '') +
           entryCommentsHtml(pair, me, e, comments) +
           '</div></div>';
       }
@@ -925,9 +926,61 @@ function tagPickHtml(id) {
     '</div></div>';
 }
 
+function recordVoice(onReady, onFail) {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined') {
+    if (onFail) onFail(new Error('当前设备不支持录音，请改用“选择音频文件”'));
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+    const rec = new MediaRecorder(stream);
+    const chunks = [];
+    const timer = setTimeout(() => { if (rec.state !== 'inactive') rec.stop(); }, 60000);
+    rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+    rec.onstop = () => {
+      stream.getTracks().forEach((t) => t.stop());
+      clearTimeout(timer);
+      const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
+      const reader = new FileReader();
+      reader.onload = () => onReady(reader.result);
+      reader.readAsDataURL(blob);
+    };
+    rec.start();
+  }).catch((e) => { if (onFail) onFail(e); });
+}
+
+function voicePickHtml(id) {
+  return '<div class="field"><label>语音留言（可选，≤60 秒）</label>' +
+    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' +
+    '<button type="button" class="btn-ghost" id="' + id + '-rec">🎤 录音</button>' +
+    '<button type="button" class="btn-ghost" id="' + id + '-file">📁 选音频文件</button>' +
+    '<span class="muted small" id="' + id + '-state"></span></div></div>';
+}
+
+function bindVoicePick(root, id, setVoice) {
+  const stateEl = $('#' + id + '-state', root);
+  const setState = (t) => { stateEl.textContent = t; };
+  $('#' + id + '-rec', root).onclick = () => {
+    recordVoice((dataUrl) => { setVoice(dataUrl); setState('已录音 ✓ 再点可重录'); },
+      (err) => { setState(''); toast(err.message); });
+  };
+  $('#' + id + '-file', root).onclick = () => {
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'audio/*';
+    inp.onchange = async () => {
+      const f = inp.files && inp.files[0];
+      if (!f) return;
+      try {
+        const r = await readAudioDataUrl(f);
+        setVoice(r.dataUrl); setState('已选音频 ✓');
+      } catch (e) { toast(e.message); }
+    };
+    inp.click();
+  };
+}
+
 function moodModal(ctx) {
   const { pair, me } = ctx.state;
-  let sel = '', img = null, tag = '';
+  let sel = '', img = null, tag = '', voice = null;
   const m = openModal(
     '<h3>😊 今日心情</h3>' +
     '<div class="emoji-pick">' + MOODS.map((x) => '<button data-e="' + x[0] + '" title="' + x[1] + '">' + x[0] + '</button>').join('') + '</div>' +
@@ -935,6 +988,7 @@ function moodModal(ctx) {
     tagPickHtml('mood-tags') +
     '<div class="field"><label>地点（可选）</label><input id="mood-loc" maxlength="30" placeholder="在哪呢？" /></div>' +
     '<div class="field"><label>配图（可选）</label><input type="file" id="mood-file" accept="image/*" /></div>' +
+    voicePickHtml('mood-v') +
     '<img class="img-preview" id="mood-prev" alt="预览" />' +
     '<div class="modal-actions"><button class="btn-ghost" id="mood-cancel">取消</button><button class="btn-primary" id="mood-ok">记下来 💗</button></div>'
   );
@@ -951,6 +1005,7 @@ function moodModal(ctx) {
       b.classList.add('on'); tag = b.dataset.tag;
     };
   });
+  bindVoicePick(m.root, 'mood-v', (d) => { voice = d; });
   const prev = $('#mood-prev');
   $('#mood-file').onchange = async (e) => {
     const f = e.target.files && e.target.files[0];
@@ -961,9 +1016,9 @@ function moodModal(ctx) {
   $('#mood-cancel').onclick = m.close;
   $('#mood-ok').onclick = async () => {
     const text = $('#mood-text').value.trim();
-    if (!text && !sel && !img) { toast('至少填一点哦'); return; }
+    if (!text && !sel && !img && !voice) { toast('至少填一点哦'); return; }
     try {
-      const d = await api.addEntry(pair.id, me.id, { type: 'mood', emoji: sel, text, image: img, tag, location: $('#mood-loc').value.trim() });
+      const d = await api.addEntry(pair.id, me.id, { type: 'mood', emoji: sel, text, image: img, voice, tag, location: $('#mood-loc').value.trim() });
       ctx.apply(d.pair); m.close(); toast('心情已记录 😊');
     } catch (e) { toast(e.message); }
   };
@@ -971,13 +1026,14 @@ function moodModal(ctx) {
 
 function foodModal(ctx) {
   const { pair, me } = ctx.state;
-  let img = null, emoji = '🍚', tag = '';
+  let img = null, emoji = '🍚', tag = '', voice = null;
   const m = openModal(
     '<h3>🍜 今天吃了啥</h3>' +
     '<div class="field"><label>吃了什么（可选）</label><textarea id="food-text" rows="2" maxlength="500" placeholder="比如：超好吃的火锅 🍲"></textarea></div>' +
     tagPickHtml('food-tags') +
     '<div class="field"><label>地点（可选）</label><input id="food-loc" maxlength="30" placeholder="在哪吃的？" /></div>' +
     '<div class="field"><label>照片（可选）</label><input type="file" id="food-file" accept="image/*" /></div>' +
+    voicePickHtml('food-v') +
     '<img class="img-preview" id="food-prev" alt="预览" />' +
     '<div class="modal-actions"><button class="btn-ghost" id="food-cancel">取消</button><button class="btn-primary" id="food-ok">记下来 🍽</button></div>'
   );
@@ -988,6 +1044,7 @@ function foodModal(ctx) {
       b.classList.add('on'); tag = b.dataset.tag;
     };
   });
+  bindVoicePick(m.root, 'food-v', (d) => { voice = d; });
   const prev = $('#food-prev');
   $('#food-file').onchange = async (e) => {
     const f = e.target.files && e.target.files[0];
@@ -998,9 +1055,9 @@ function foodModal(ctx) {
   $('#food-cancel').onclick = m.close;
   $('#food-ok').onclick = async () => {
     const text = $('#food-text').value.trim();
-    if (!text && !img) { toast('至少写点或传张图哦'); return; }
+    if (!text && !img && !voice) { toast('至少写点或传张图哦'); return; }
     try {
-      const d = await api.addEntry(pair.id, me.id, { type: 'food', emoji, text, image: img, tag, location: $('#food-loc').value.trim() });
+      const d = await api.addEntry(pair.id, me.id, { type: 'food', emoji, text, image: img, voice, tag, location: $('#food-loc').value.trim() });
       ctx.apply(d.pair); m.close(); toast('干饭记录 +1 🍜');
     } catch (e) { toast(e.message); }
   };

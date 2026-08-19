@@ -1,5 +1,5 @@
 // sw.js —— 离线缓存（PWA 可安装）
-const CACHE = 'couple-home-v9';
+const CACHE = 'couple-home-v10';
 const CORE = [
   '/', '/index.html', '/css/style.css',
   '/js/app.js', '/js/api.js', '/js/ui.js', '/js/music.js', '/js/views.js',
@@ -38,5 +38,29 @@ self.addEventListener('fetch', (e) => {
       if (r.ok) { const copy = r.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
       return r;
     }))
+  );
+});
+
+// ---------------- Push 通知 ----------------
+self.addEventListener('push', (event) => {
+  let data = { title: '我们的小屋', body: '' };
+  try { if (event.data) data = JSON.parse(event.data.text()); } catch (e) { /* 忽略 */ }
+  event.waitUntil(
+    self.registration.showNotification(data.title || '我们的小屋', {
+      body: data.body || '',
+      icon: 'icons/icon-192.png',
+      badge: 'icons/icon-192.png',
+      data: { url: '/' }
+    })
+  );
+});
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || '/';
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      for (const c of list) { if ('focus' in c) return c.focus(); }
+      return clients.openWindow(url);
+    })
   );
 });

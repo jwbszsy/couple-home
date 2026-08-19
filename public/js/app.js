@@ -372,12 +372,45 @@ const ctx = {
 };
 
 // ---------------- 配对流程 ----------------
+function initPush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !state.pair || !state.me) return;
+  const ask = () => {
+    if (Notification.permission === 'granted') doSubscribe();
+    else if (Notification.permission !== 'denied') {
+      Notification.requestPermission().then((p) => { if (p === 'granted') doSubscribe(); }).catch(() => {});
+    }
+  };
+  if (Notification.permission === 'granted') doSubscribe();
+  else if (Notification.permission === 'default') setTimeout(ask, 1500);
+}
+async function doSubscribe() {
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const d = await api.getVapidKey();
+    if (!d || !d.publicKey) return;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(d.publicKey) });
+    }
+    await api.subscribePush(state.pair.id, state.me.id, sub.toJSON());
+  } catch (e) { /* 忽略：浏览器不支持或用户拒绝 */ }
+}
+function urlBase64ToUint8Array(b64) {
+  const pad = '='.repeat((4 - (b64.length % 4)) % 4);
+  const b = (b64 + pad).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(b);
+  const arr = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+
 function boot(token) {
   $('#onboard').classList.add('hidden');
   $('#bottom-nav').classList.remove('hidden');
   $('#musicbar').classList.remove('hidden');
   api.syncState(token.pairId, token.memberId).then((d) => {
     apply(d.pair);
+    initPush();
     render(state.view, ctx);
     if (USE_POLL) {
       setInterval(() => { api.syncState(token.pairId, token.memberId).then((x) => apply(x.pair)).catch(() => {}); }, 8000);
@@ -417,6 +450,7 @@ function bindOnboard() {
     if (!b || !b.dataset.mode) return;
     mode = b.dataset.mode;
     $$('.seg-btn', seg).forEach((x) => x.classList.toggle('active', x === b));
+    $('#create-code-wrap').classList.toggle('hidden', mode !== 'create');
     $('#join-code-wrap').classList.toggle('hidden', mode !== 'join');
     $('#restore-wrap').classList.toggle('hidden', mode !== 'restore');
     $('#nickname-wrap').classList.toggle('hidden', mode === 'restore');
@@ -450,10 +484,26 @@ function bindOnboard() {
       return;
     }
     if (!nickname) { err.textContent = '先告诉我怎么称呼你～'; err.classList.remove('hidden'); return; }
+    if (mode === 'create') {
+      const actCode = $('#create-code').value.trim().toUpperCase().replace(/\s+/g, '');
+      if (!actCode) { err.textContent = '请输入激活码（付费后你会获得一个）'; err.classList.remove('hidden'); return; }
+      const btn = $('#onboard-submit');
+      btn.disabled = true; btn.textContent = '等一下下…';
+      try {
+        const d = await api.createPair(nickname, actCode);
+        localStorage.setItem(TOKEN_KEY, JSON.stringify({ pairId: d.pairId, memberId: d.memberId }));
+        boot({ pairId: d.pairId, memberId: d.memberId });
+      } catch (ex) {
+        err.textContent = ex.message; err.classList.remove('hidden');
+      } finally {
+        btn.disabled = false; btn.textContent = '开始 💗';
+      }
+      return;
+    }
     const btn = $('#onboard-submit');
     btn.disabled = true; btn.textContent = '等一下下…';
     try {
-      const d = mode === 'create' ? await api.createPair(nickname) : await api.joinPair(code, nickname);
+      const d = await api.joinPair(code, nickname);
       localStorage.setItem(TOKEN_KEY, JSON.stringify({ pairId: d.pairId, memberId: d.memberId }));
       if (mode === 'join') toast('欢迎加入小屋 🎉');
       boot({ pairId: d.pairId, memberId: d.memberId });

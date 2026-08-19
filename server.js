@@ -23,11 +23,90 @@ const MAX_JSON_BODY = 18 * 1024 * 1024;   // 单次请求体上限（头像/背�
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;  // 单张图片 base64 上限
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024; // 单首音乐 base64 上限
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 去掉易混淆字符
+const ADMIN_PASS = process.env.ADMIN_PASS || 'admin888';    // 管理后台密码
+const ACTIVATION_FILE = path.join(DATA_DIR, 'activations.json');
+const VAPID_FILE = path.join(DATA_DIR, 'vapid.json');
+const MAX_VOICE_BYTES = 2 * 1024 * 1024;                    // 语音留言上限
+const SEED = 'couple-home-activation-v1';                   // 激活码确定性种子（本地/服务器一致）
+let webPush = null;
+try { webPush = require('web-push'); } catch (e) { /* 未安装则跳过推送 */ }
 
 // ---------------- 持久化 ----------------
 let db = { pairs: {} };
 try { db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8')); } catch (e) { /* 首次运行 */ }
 for (const pid of Object.keys(db.pairs || {})) normalizePair(db.pairs[pid]);
+
+// ---------------- 激活码 ----------------
+function genCodeByIndex(i) {
+  const b1 = crypto.createHmac('sha256', SEED).update('code:' + i).digest();
+  const b2 = crypto.createHmac('sha256', SEED).update('code2:' + i).digest();
+  const buf = Buffer.concat([b1, b2]);
+  let code = '';
+  let pos = 0;
+  while (code.length < 8) {
+    code += CODE_ALPHABET[buf[pos % buf.length] % CODE_ALPHABET.length];
+    pos++;
+  }
+  return code.slice(0, 4) + '-' + code.slice(4, 8);
+}
+function genCodes(count, startIdx) {
+  const seen = new Set();
+  const out = [];
+  let i = startIdx;
+  while (out.length < count) {
+    const code = genCodeByIndex(i);
+    if (!seen.has(code)) {
+      seen.add(code);
+      out.push({ code, used: false, usedBy: null, usedAt: null });
+    }
+    i++;
+  }
+  return out;
+}
+let activations = null;
+function loadActivations() {
+  try { activations = JSON.parse(fs.readFileSync(ACTIVATION_FILE, 'utf8')); } catch (e) { activations = null; }
+  if (!activations || !Array.isArray(activations.codes)) {
+    activations = { codes: genCodes(200, 0), nextIndex: 200 };
+    saveActivations();
+  }
+}
+function saveActivations() {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.writeFileSync(ACTIVATION_FILE + '.tmp', JSON.stringify(activations));
+  fs.renameSync(ACTIVATION_FILE + '.tmp', ACTIVATION_FILE);
+}
+loadActivations();
+
+// ---------------- VAPID / 推送 ----------------
+let VAPID = null;
+function loadVapid() {
+  try { VAPID = JSON.parse(fs.readFileSync(VAPID_FILE, 'utf8')); } catch (e) { VAPID = null; }
+  if (webPush) {
+    if (!VAPID || !VAPID.publicKey) {
+      VAPID = webPush.generateVAPIDKeys();
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+      fs.writeFileSync(VAPID_FILE, JSON.stringify(VAPID));
+    }
+    webPush.setVapidDetails('mailto:couple@localhost', VAPID.publicKey, VAPID.privateKey);
+  }
+}
+loadVapid();
+
+// 管理后台会话（内存 token）
+const adminTokens = new Map();
+function adminTokenOk(token) {
+  const e = adminTokens.get(token);
+  return !!e && e > Date.now();
+}
+
+// 向对方推送通知（未启用或订阅失效时静默跳过）
+function sendPush(targetMember, title, body) {
+  if (!webPush || !VAPID || !targetMember || !targetMember.pushSub) return;
+  webPush.sendNotification(targetMember.pushSub, JSON.stringify({ title, body, ts: Date.now() }))
+    .then(() => {})
+    .catch(() => { targetMember.pushSub = null; });
+}
 
 let saveQueued = false;
 function save() {
@@ -102,11 +181,12 @@ function normalizePair(pair) {
   if (!pair.theme) pair.theme = 'pink';
   if (!pair.declaration) pair.declaration = '';
   if (!Array.isArray(pair.capsules)) pair.capsules = [];
-  for (const m of Object.values(pair.members || {})) { if (!m.missYou) m.missYou = null; }
+  for (const m of Object.values(pair.members || {})) { if (!m.missYou) m.missYou = null; if (!m.pushSub) m.pushSub = null; }
   for (const e of pair.entries) {
     if (!Array.isArray(e.comments)) e.comments = [];
     if (!e.tag) e.tag = null;
     if (!e.location) e.location = null;
+    if (!e.voice) e.voice = null;
   }
   return pair;
 }
@@ -220,6 +300,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname === '/health') return json(res, 200, { ok: true, name: 'couple-home', ts: Date.now() });
+  if (pathname === '/admin') pathname = '/admin.html';
 
   serveStatic(req, res, pathname);
 });
@@ -227,9 +308,44 @@ const server = http.createServer(async (req, res) => {
 function routeApi(method, p, body, res) {
   const pairId = body.pairId, memberId = body.memberId;
 
+  // ---- 管理员 ----
+  if (method === 'POST' && p === '/api/admin/login') {
+    if (String(body.password || '') !== ADMIN_PASS) return fail(res, 403, '密码错误');
+    const token = 'adm' + crypto.randomBytes(16).toString('hex');
+    adminTokens.set(token, Date.now() + 12 * 3600 * 1000);
+    return ok(res, { token });
+  }
+  if (method === 'POST' && p === '/api/admin/stats') {
+    if (!adminTokenOk(body.token)) return fail(res, 403, '请先登录');
+    const codes = activations.codes.map((x) => ({ code: x.code, used: x.used, usedAt: x.usedAt }));
+    const used = activations.codes.filter((x) => x.used).length;
+    return ok(res, { total: activations.codes.length, used, remaining: activations.codes.length - used, nextIndex: activations.nextIndex, codes });
+  }
+  if (method === 'POST' && p === '/api/admin/codes/generate') {
+    if (!adminTokenOk(body.token)) return fail(res, 403, '请先登录');
+    const count = Math.min(500, Math.max(1, parseInt(body.count, 10) || 1));
+    const start = activations.nextIndex;
+    const newCodes = genCodes(count, start);
+    activations.codes = activations.codes.concat(newCodes);
+    activations.nextIndex = start + count;
+    saveActivations();
+    return ok(res, { codes: newCodes.map((x) => x.code) });
+  }
+  if (method === 'POST' && p === '/api/admin/codes/export') {
+    if (!adminTokenOk(body.token)) return fail(res, 403, '请先登录');
+    const text = activations.codes.filter((x) => !x.used).map((x) => x.code).join('\n');
+    return ok(res, { text });
+  }
+
   // ---- 配对 ----
   if (method === 'POST' && p === '/api/pair/create') {
+    const act = String(body.activationCode || '').trim().toUpperCase().replace(/\s+/g, '');
+    const found = activations.codes.find((x) => x.code === act);
+    if (!found) return fail(res, 400, '请输入有效的激活码（付费后你会获得一个）');
+    if (found.used) return fail(res, 400, '这个激活码已被使用过了');
     const pair = newPair(body.nickname, 'boy');
+    found.used = true; found.usedBy = pair.id; found.usedAt = Date.now();
+    saveActivations();
     save();
     return ok(res, { pairId: pair.id, memberId: Object.keys(pair.members)[0], code: pair.code, pair });
   }
@@ -261,6 +377,9 @@ function routeApi(method, p, body, res) {
     const chk = requirePairMember(pairId, memberId);
     if (chk.error) return fail(res, 403, chk.error);
     return ok(res, { pair: chk.pair, memberId });
+  }
+  if (method === 'POST' && p === '/api/push/vapid-key') {
+    return ok(res, { publicKey: VAPID ? VAPID.publicKey : null });
   }
 
   // ---- 需要成员身份 ----
@@ -319,13 +438,21 @@ function routeApi(method, p, body, res) {
     const emoji = String(body.emoji || '').slice(0, 8);
     let image = null;
     if (body.image) { assertSize(body.image, MAX_IMAGE_BYTES); image = body.image; }
-    if (!text && !emoji && !image) return fail(res, 400, '至少填写一点内容哦');
+    let voice = null;
+    if (body.voice) {
+      if (!String(body.voice).startsWith('data:audio/')) return fail(res, 400, '仅支持音频格式');
+      assertSize(body.voice, MAX_VOICE_BYTES);
+      voice = body.voice;
+    }
+    if (!text && !emoji && !image && !voice) return fail(res, 400, '至少填写一点内容哦');
     const tag = String(body.tag || '').trim().slice(0, 10) || null;
     const location = String(body.location || '').trim().slice(0, 30) || null;
     pair.entries.push({
-      id: uid('e'), memberId, type, text, emoji, image, comments: [], tag, location,
+      id: uid('e'), memberId, type, text, emoji, image, voice, comments: [], tag, location,
       date: String(body.date || todayStr()), createdAt: Date.now()
     });
+    const partner = Object.values(pair.members).find((m) => m.id !== memberId);
+    sendPush(partner, member.nickname + ' 发了新动态 💬', (emoji || '') + (text ? text.slice(0, 40) : ''));
     changed();
     return ok(res, { pair, memberId });
   }
@@ -367,7 +494,14 @@ function routeApi(method, p, body, res) {
   }
   if (method === 'POST' && p === '/api/todo/toggle') {
     const t = pair.todos.find((x) => x.id === body.todoId);
-    if (t) { t.done = !!body.done; t.doneAt = t.done ? Date.now() : null; changed(); }
+    if (t) {
+      t.done = !!body.done; t.doneAt = t.done ? Date.now() : null;
+      if (t.done) {
+        const partner = Object.values(pair.members).find((m) => m.id !== memberId);
+        sendPush(partner, member.nickname + ' 完成了清单 ✓', String(t.text || '').slice(0, 40));
+      }
+      changed();
+    }
     return ok(res, { pair, memberId });
   }
   if (method === 'POST' && p === '/api/todo/delete') {
@@ -407,6 +541,8 @@ function routeApi(method, p, body, res) {
     const today = todayStr();
     const mine = member.missYou || { date: '', count: 0 };
     member.missYou = (mine.date === today) ? { date: today, count: mine.count + 1 } : { date: today, count: 1 };
+    const partner = Object.values(pair.members).find((m) => m.id !== memberId);
+    sendPush(partner, member.nickname + ' 想你了 💗', '点开看看 TA 的想念');
     changed();
     return ok(res, { pair, memberId });
   }
@@ -437,6 +573,13 @@ function routeApi(method, p, body, res) {
     const capsuleId = String(body.capsuleId || '');
     const i = pair.capsules.findIndex((x) => x.id === capsuleId);
     if (i >= 0) { pair.capsules.splice(i, 1); changed(); }
+    return ok(res, { pair, memberId });
+  }
+  if (method === 'POST' && p === '/api/push/subscribe') {
+    const sub = body.subscription;
+    if (!sub || !sub.endpoint) return fail(res, 400, '订阅信息无效');
+    member.pushSub = sub;
+    changed();
     return ok(res, { pair, memberId });
   }
 

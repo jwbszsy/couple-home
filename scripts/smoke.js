@@ -10,8 +10,21 @@ async function post(path, body) {
 (async () => {
   const idx = await fetch(BASE + '/').then((r) => r.text()).catch(() => '');
   check('静态首页可访问且含标题', idx.includes('我们的小屋'));
+  const fs = require('fs');
+  function takeCode() {
+    const a = JSON.parse(fs.readFileSync('data/activations.json', 'utf8'));
+    const x = a.codes.find((v) => !v.used);
+    if (!x) throw new Error('没有可用激活码');
+    return x.code;
+  }
+  const okCode = takeCode();
 
-  const c = await post('/api/pair/create', { nickname: '杨皓翔' });
+  const noAct = await post('/api/pair/create', { nickname: '无码' });
+  check('创建无激活码被拒', !noAct.ok);
+  const badAct = await post('/api/pair/create', { nickname: '错码', activationCode: 'XXXX-XXXX' });
+  check('错误激活码被拒', !badAct.ok);
+
+  const c = await post('/api/pair/create', { nickname: '杨皓翔', activationCode: okCode });
   check('创建小屋返回邀请码', !!(c.ok && c.data.code && c.data.pairId && c.data.memberId));
   const { pairId, memberId: boyId, code } = c.data;
 
@@ -21,6 +34,23 @@ async function post(path, body) {
 
   const j2 = await post('/api/pair/join', { code, nickname: '第三人' });
   check('第三人被拒绝', !j2.ok);
+
+  const al = await post('/api/admin/login', { password: 'admin888' });
+  check('管理后台登录', al.ok && !!al.data.token);
+  const aToken = al.data.token;
+  const adStats = await post('/api/admin/stats', { token: aToken });
+  check('后台统计', adStats.ok && adStats.data.total === 200 && adStats.data.used === 1 && adStats.data.remaining === 199);
+  const exp = await post('/api/admin/codes/export', { token: aToken });
+  check('导出未用码', exp.ok && exp.data.text.split('\n').length === 199);
+  const gen = await post('/api/admin/codes/generate', { token: aToken, count: 5 });
+  check('补充码', gen.ok && gen.data.codes.length === 5);
+  const adStats2 = await post('/api/admin/stats', { token: aToken });
+  check('补充后总数 205', adStats2.ok && adStats2.data.total === 205);
+  const badLogin = await post('/api/admin/login', { password: 'wrong' });
+  check('错误管理密码被拒', !badLogin.ok);
+
+  const ps = await post('/api/push/subscribe', { pairId, memberId: boyId, subscription: { endpoint: 'https://fcm.example/x', keys: { p256dh: 'a', auth: 'b' } } });
+  check('推送订阅保存', ps.ok && ps.data.pair.members[boyId].pushSub && ps.data.pair.members[boyId].pushSub.endpoint === 'https://fcm.example/x');
 
   const rsB = await post('/api/restore', { code, role: 'boy' });
   check('房间码+男方恢复', rsB.ok && rsB.data.pairId === pairId && rsB.data.memberId === boyId);
@@ -106,6 +136,8 @@ async function post(path, body) {
   check('删除时空胶囊', capRm.ok && capRm.data.pair.capsules.length === 0);
   const et = await post('/api/entry', { pairId, memberId: girlId, type: 'food', text: 'tag test', tag: '约会', location: '上海' });
   check('动态带标签与地点', et.ok && et.data.pair.entries.some((e) => e.tag === '约会' && e.location === '上海'));
+  const ev = await post('/api/entry', { pairId, memberId: girlId, type: 'mood', emoji: '🎤', voice: 'data:audio/webm;base64,AAAA' });
+  check('动态带语音', ev.ok && ev.data.pair.entries.some((e) => e.voice && e.voice.startsWith('data:audio/')));
 
   const mp = await post('/api/music/pick', { pairId, memberId: boyId, trackId: 'bt_sunrise', source: 'builtin' });
   check('点内置歌', mp.ok && mp.data.pair.music.nowPlaying.trackId === 'bt_sunrise');
