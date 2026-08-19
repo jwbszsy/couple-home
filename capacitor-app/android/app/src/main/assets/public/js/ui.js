@@ -1,1 +1,121 @@
-function _0x2726(){const _0x3d13f2=['5758137TDJqEL','opacity\x20.4s','querySelectorAll','<button\x20class=\x22btn-primary\x22\x20id=\x22m-ok\x22>','4123930YqezRG','canvas','round','textContent','2nChVBe','bind','2289318mDmyIm','AGeVz','5170896hTLdwL','10IRDiPi','AkoxU','lmLsM','JThLc','\x22\x20alt=\x22头像\x22\x20/>','dhSES','RZEkA','firstChild','#m-ok','addEventListener','DabFu','floor','WbULK','some','vFcmY','padStart','querySelector','<div\x20class=\x22modal\x22>','height','onclick','CBOdY','ANQzM','toast','now','size','max','Vvelm','54euKuzk','HEFdG','replace','getMonth','getFullYear','图片解析失败：如果是\x20iPhone\x20的\x20HEIC\x20照片，请先在相册里转成\x20JPEG/PNG\x20再上传','yGfmW','8219624eevBYM','JihLz','ppitH','文件读取失败','apply','toString','</h3>','#m-cancel','<div\x20class=\x22modal-actions\x22>','avatar','root','1225846KUuvci','gDQwh','AZqgw','KoTGA','innerHTML','onload','slice','ickOU','yHkIS','&quot;','HONVv','MLyqy','(((.+)+)+)+$','close','NulBU','wjPaA','div','ZhPKt','nmosE','getMinutes','test','image/jpeg','toDataURL','</div>','<button\x20class=\x22btn-ghost\x22\x20id=\x22m-cancel\x22>再想想</button>','className','getContext','min','HqszZ','<div\x20class=\x22','#toast-root','Pvaks','音频不能超过\x208MB','请选择音频文件（mp3/m4a/ogg/wav）','map','akyzP','Keeoc','gSDVl','length','result','role','indexOf','emImn','&gt;','remove','vyfsO','<h3>','onerror','search','style','\x20avatar-fallback\x22>','ioEwT','EFJsx','7183268GRFGMo','图片处理失败，请换一张试试','<p\x20class=\x22muted\x22\x20style=\x22font-size:14px;line-height:1.7;\x22>','width','lBEtZ','drawImage','readAsDataURL','hessY','&amp;','type','createElement','appendChild','transition','</button>','getTime','getDate','opacity','from','hbXRF'];_0x2726=function(){return _0x3d13f2;};return _0x2726();}const _0x1ac049=_0x6ea2;(function(_0x4b581e,_0x6ede65){const _0x21c2b9=_0x6ea2,_0x3f7b5e=_0x4b581e();while(!![]){try{const _0x581e78=-parseInt(_0x21c2b9(0x187))/0x1*(parseInt(_0x21c2b9(0x155))/0x2)+parseInt(_0x21c2b9(0x159))/0x3+parseInt(_0x21c2b9(0x13a))/0x4+-parseInt(_0x21c2b9(0x15a))/0x5*(parseInt(_0x21c2b9(0x157))/0x6)+parseInt(_0x21c2b9(0x14d))/0x7+parseInt(_0x21c2b9(0x17c))/0x8+parseInt(_0x21c2b9(0x175))/0x9*(-parseInt(_0x21c2b9(0x151))/0xa);if(_0x581e78===_0x6ede65)break;else _0x3f7b5e['push'](_0x3f7b5e['shift']());}catch(_0x5ac5c4){_0x3f7b5e['push'](_0x3f7b5e['shift']());}}}(_0x2726,0xdd3c7));const _0x57b0cc=(function(){let _0x1933e2=!![];return function(_0x246f61,_0x593cb0){const _0x45c1de=_0x1933e2?function(){const _0x3e8ebc=_0x6ea2;if(_0x593cb0){const _0x3f1170=_0x593cb0[_0x3e8ebc(0x180)](_0x246f61,arguments);return _0x593cb0=null,_0x3f1170;}}:function(){};return _0x1933e2=![],_0x45c1de;};}()),_0x26e58c=_0x57b0cc(this,function(){const _0xc05887=_0x6ea2,_0x4c7818={'dhSES':_0xc05887(0x193)};if(_0x26e58c[_0xc05887(0x156)]()[_0xc05887(0x181)]()[_0xc05887(0x12e)]('\x0a')!==-0x1)return;return _0x26e58c[_0xc05887(0x181)]()[_0xc05887(0x135)](_0xc05887(0x193))[_0xc05887(0x181)]()['constructor'](_0x26e58c)[_0xc05887(0x135)](_0x4c7818[_0xc05887(0x15f)]);});_0x26e58c();export const $=(_0x146fd1,_0x8122f8)=>(_0x8122f8||document)[_0x1ac049(0x16a)](_0x146fd1);export const $$=(_0x23cc23,_0x58c244)=>Array[_0x1ac049(0x14b)]((_0x58c244||document)[_0x1ac049(0x14f)](_0x23cc23));export function esc(_0x5b1a59){const _0x4845f3=_0x1ac049;return String(_0x5b1a59==null?'':_0x5b1a59)['replace'](/[&<>"']/g,_0x5c0114=>({'&':_0x4845f3(0x142),'<':'&lt;','>':_0x4845f3(0x130),'\x22':_0x4845f3(0x190),'\x27':'&#39;'}[_0x5c0114]));}export function toast(_0x2c652a,_0xe83347){const _0xaa7b4f=_0x1ac049,_0x26195c={'EFJsx':function(_0x49d12a,_0x106c9b){return _0x49d12a||_0x106c9b;},'NulBU':_0xaa7b4f(0x197),'Keeoc':_0xaa7b4f(0x170),'ioEwT':function(_0x407d2c,_0x1229fd,_0xe42321){return _0x407d2c(_0x1229fd,_0xe42321);},'dPXEf':function(_0x363f27,_0x1e6ee2){return _0x363f27-_0x1e6ee2;},'ANQzM':function(_0x598333,_0x32b3f,_0x323fc8){return _0x598333(_0x32b3f,_0x323fc8);}};_0xe83347=_0x26195c[_0xaa7b4f(0x139)](_0xe83347,0x898);const _0x41d322=$(_0xaa7b4f(0x123)),_0x5ecd02=document[_0xaa7b4f(0x144)](_0x26195c[_0xaa7b4f(0x195)]);_0x5ecd02['className']=_0x26195c[_0xaa7b4f(0x129)],_0x5ecd02[_0xaa7b4f(0x154)]=_0x2c652a,_0x41d322[_0xaa7b4f(0x145)](_0x5ecd02),_0x26195c[_0xaa7b4f(0x138)](setTimeout,()=>{const _0x15e67e=_0xaa7b4f;_0x5ecd02[_0x15e67e(0x136)][_0x15e67e(0x14a)]='0',_0x5ecd02[_0x15e67e(0x136)][_0x15e67e(0x146)]=_0x15e67e(0x14e);},_0x26195c['dPXEf'](_0xe83347,0x190)),_0x26195c[_0xaa7b4f(0x16f)](setTimeout,()=>_0x5ecd02[_0xaa7b4f(0x131)](),_0xe83347);}export function todayKey(){const _0x1f45e7=_0x1ac049,_0x4841f3={'AGeVz':function(_0x1ff8b2,_0x3dd4b7){return _0x1ff8b2+_0x3dd4b7;},'nmosE':function(_0x1c8dd4,_0xe11c8f){return _0x1c8dd4(_0xe11c8f);}},_0x3a8afd=new Date();return _0x4841f3[_0x1f45e7(0x158)](_0x3a8afd[_0x1f45e7(0x179)]()+'-'+String(_0x3a8afd[_0x1f45e7(0x178)]()+0x1)[_0x1f45e7(0x169)](0x2,'0')+'-',_0x4841f3[_0x1f45e7(0x199)](String,_0x3a8afd[_0x1f45e7(0x149)]())[_0x1f45e7(0x169)](0x2,'0'));}export function fmtClock(_0x4376c1){const _0x13544b=_0x1ac049,_0x28c1ba={'WbULK':function(_0x11412b,_0x43ae79){return _0x11412b(_0x43ae79);}},_0x2f2e2a=new Date(_0x4376c1);return _0x28c1ba[_0x13544b(0x166)](String,_0x2f2e2a['getHours']())['padStart'](0x2,'0')+':'+String(_0x2f2e2a[_0x13544b(0x118)]())[_0x13544b(0x169)](0x2,'0');}export function daysTogether(_0x4cd94c){const _0x27c9eb=_0x1ac049,_0x291b5f={'Vvelm':function(_0x4589e6,_0x39db0c){return _0x4589e6||_0x39db0c;},'hbXRF':function(_0xb83a46,_0xcee063){return _0xb83a46!==_0xcee063;},'ZhPKt':function(_0x1103e6,_0x1b9b1d){return _0x1103e6-_0x1b9b1d;},'yHkIS':function(_0x5c4c64,_0x145826){return _0x5c4c64/_0x145826;},'vyfsO':function(_0x4f51bf,_0x246e81){return _0x4f51bf/_0x246e81;},'ppitH':function(_0x358986,_0x44c675){return _0x358986%_0x44c675;},'GlYND':function(_0x132e04,_0x4b44e4){return _0x132e04/_0x4b44e4;},'HqszZ':function(_0x435459,_0x55f7bc){return _0x435459%_0x55f7bc;}},_0x52d040=String(_0x291b5f[_0x27c9eb(0x174)](_0x4cd94c,''))['split']('-')[_0x27c9eb(0x127)](Number);if(_0x291b5f[_0x27c9eb(0x14c)](_0x52d040[_0x27c9eb(0x12b)],0x3)||_0x52d040[_0x27c9eb(0x167)](isNaN))return{'days':0x0,'hours':0x0,'mins':0x0,'secs':0x0};const _0x4fd6c0=new Date(_0x52d040[0x0],_0x291b5f[_0x27c9eb(0x198)](_0x52d040[0x1],0x1),_0x52d040[0x2],0x0,0x0,0x0);let _0x484bb6=Date[_0x27c9eb(0x171)]()-_0x4fd6c0[_0x27c9eb(0x148)]();if(_0x484bb6<0x0)_0x484bb6=0x0;const _0x5733ba=Math['floor'](_0x291b5f[_0x27c9eb(0x18f)](_0x484bb6,0x3e8));return{'days':Math[_0x27c9eb(0x165)](_0x291b5f[_0x27c9eb(0x132)](_0x5733ba,0x15180)),'hours':Math[_0x27c9eb(0x165)](_0x291b5f[_0x27c9eb(0x17e)](_0x5733ba,0x15180)/0xe10),'mins':Math[_0x27c9eb(0x165)](_0x291b5f['GlYND'](_0x291b5f[_0x27c9eb(0x17e)](_0x5733ba,0xe10),0x3c)),'secs':_0x291b5f[_0x27c9eb(0x121)](_0x5733ba,0x3c)};}export function compressImage(_0x34d36b,_0x229a7a,_0x223e1e){return _0x223e1e=_0x223e1e==null?0.85:_0x223e1e,new Promise((_0x5bb813,_0x5755ad)=>{const _0x2351e0=_0x6ea2,_0x9f7f47={'vFcmY':function(_0x50453c,_0x5c6c1c){return _0x50453c*_0x5c6c1c;},'HEFdG':function(_0x3d34d0,_0x6d9437){return _0x3d34d0(_0x6d9437);}},_0x598786=new FileReader();_0x598786[_0x2351e0(0x18c)]=()=>{const _0xe42a9=_0x2351e0,_0x2c76a7={'JThLc':function(_0x1783af,_0x2c5704){const _0x447e60=_0x6ea2;return _0x9f7f47[_0x447e60(0x168)](_0x1783af,_0x2c5704);},'hessY':function(_0x16bc17,_0x5adef6){const _0xd0a8db=_0x6ea2;return _0x9f7f47[_0xd0a8db(0x176)](_0x16bc17,_0x5adef6);},'KoTGA':function(_0xbec441,_0xa750cd){return _0xbec441<_0xa750cd;},'Ciewq':function(_0x35ef01,_0x1f308e){return _0x35ef01*_0x1f308e;},'Pvaks':function(_0xb50ac3,_0x2382c6){return _0xb50ac3(_0x2382c6);}},_0x118f1d=_0x598786[_0xe42a9(0x12c)],_0x362e37=new Image();_0x362e37[_0xe42a9(0x18c)]=()=>{const _0x4e95e8=_0xe42a9;try{const _0x3bb004=Math[_0x4e95e8(0x120)](0x1,_0x229a7a/Math[_0x4e95e8(0x173)](_0x362e37[_0x4e95e8(0x13d)],_0x362e37[_0x4e95e8(0x16c)])),_0x1493f4=Math[_0x4e95e8(0x173)](0x1,Math[_0x4e95e8(0x153)](_0x2c76a7[_0x4e95e8(0x15d)](_0x362e37[_0x4e95e8(0x13d)],_0x3bb004))),_0x377533=Math[_0x4e95e8(0x173)](0x1,Math[_0x4e95e8(0x153)](_0x2c76a7['JThLc'](_0x362e37[_0x4e95e8(0x16c)],_0x3bb004))),_0x602866=document[_0x4e95e8(0x144)](_0x4e95e8(0x152));_0x602866['width']=_0x1493f4,_0x602866[_0x4e95e8(0x16c)]=_0x377533,_0x602866[_0x4e95e8(0x11f)]('2d')[_0x4e95e8(0x13f)](_0x362e37,0x0,0x0,_0x1493f4,_0x377533),_0x2c76a7[_0x4e95e8(0x141)](_0x5bb813,_0x602866[_0x4e95e8(0x11b)](_0x4e95e8(0x11a),_0x223e1e));}catch(_0x5995d9){if(_0x118f1d&&_0x2c76a7[_0x4e95e8(0x18a)](_0x118f1d[_0x4e95e8(0x12b)],_0x2c76a7['Ciewq'](_0x2c76a7[_0x4e95e8(0x15d)](4.5,0x400),0x400)))_0x2c76a7[_0x4e95e8(0x124)](_0x5bb813,_0x118f1d);else _0x5755ad(new Error(_0x4e95e8(0x13b)));}},_0x362e37[_0xe42a9(0x134)]=()=>_0x5755ad(new Error(_0xe42a9(0x17a))),_0x362e37['src']=_0x118f1d;},_0x598786[_0x2351e0(0x134)]=()=>_0x5755ad(new Error(_0x2351e0(0x17f))),_0x598786[_0x2351e0(0x140)](_0x34d36b);});}export function readAudioDataUrl(_0x356d40){const _0x39bacf=_0x1ac049,_0xac7732={'pxvWM':_0x39bacf(0x125)};return new Promise((_0x74df88,_0x2dc2e0)=>{const _0x2244e7=_0x39bacf;if(!/^audio\//[_0x2244e7(0x119)](_0x356d40[_0x2244e7(0x143)])){_0x2dc2e0(new Error(_0x2244e7(0x126)));return;}if(_0x356d40[_0x2244e7(0x172)]>0x8*0x400*0x400){_0x2dc2e0(new Error(_0xac7732['pxvWM']));return;}const _0x26d287=new FileReader();_0x26d287[_0x2244e7(0x18c)]=()=>_0x74df88({'dataUrl':_0x26d287['result'],'name':_0x356d40['name'][_0x2244e7(0x177)](/\.[^.]+$/,'')[_0x2244e7(0x18d)](0x0,0x3c)}),_0x26d287[_0x2244e7(0x134)]=()=>_0x2dc2e0(new Error('文件读取失败')),_0x26d287[_0x2244e7(0x140)](_0x356d40);});}export function avatarHtml(_0x138b1b,_0x8d4b3a){const _0x12a7c2=_0x1ac049,_0x39187c={'AZqgw':function(_0x2d0477,_0x4b057e){return _0x2d0477+_0x4b057e;},'JihLz':_0x12a7c2(0x15e),'ickOU':function(_0x30b649,_0x33bca7){return _0x30b649+_0x33bca7;},'LZxxW':function(_0xb9362e,_0x26053c){return _0xb9362e+_0x26053c;},'AkoxU':_0x12a7c2(0x185),'MLyqy':_0x12a7c2(0x137),'BZBtc':function(_0x3f93f7,_0x1501bf){return _0x3f93f7===_0x1501bf;}};if(_0x138b1b&&_0x138b1b[_0x12a7c2(0x185)])return _0x39187c[_0x12a7c2(0x189)]('<img\x20class=\x22'+(_0x8d4b3a||_0x12a7c2(0x185))+'\x22\x20src=\x22'+_0x138b1b[_0x12a7c2(0x185)],_0x39187c[_0x12a7c2(0x17d)]);return _0x39187c[_0x12a7c2(0x18e)](_0x39187c['LZxxW'](_0x12a7c2(0x122),_0x8d4b3a||_0x39187c[_0x12a7c2(0x15b)]),_0x39187c[_0x12a7c2(0x192)])+(_0x138b1b&&_0x39187c['BZBtc'](_0x138b1b[_0x12a7c2(0x12d)],'girl')?'👧':'🧑')+_0x12a7c2(0x11c);}export function openModal(_0x4b795d){const _0x1e0f39=_0x1ac049,_0x341a59={'CBOdY':function(_0x3efe2d){return _0x3efe2d();},'yGfmW':_0x1e0f39(0x197),'akyzP':function(_0x48e391,_0x576fad){return _0x48e391+_0x576fad;},'aDQcL':_0x1e0f39(0x16b),'wjPaA':'click','gDQwh':function(_0x4b3e33,_0x4e7e94){return _0x4b3e33(_0x4e7e94);}},_0x4893cf=document[_0x1e0f39(0x144)](_0x341a59[_0x1e0f39(0x17b)]);_0x4893cf[_0x1e0f39(0x11e)]='modal-mask',_0x4893cf[_0x1e0f39(0x18b)]=_0x341a59[_0x1e0f39(0x128)](_0x341a59['aDQcL']+_0x4b795d,_0x1e0f39(0x11c));const _0x5c3b0a=_0x4893cf[_0x1e0f39(0x161)];_0x4893cf[_0x1e0f39(0x163)](_0x341a59[_0x1e0f39(0x196)],_0x4efdd6=>{const _0x46f78e=_0x1e0f39;if(_0x4efdd6['target']===_0x4893cf)_0x341a59[_0x46f78e(0x16e)](_0x48061b);}),_0x341a59[_0x1e0f39(0x188)]($,'#modal-root')[_0x1e0f39(0x145)](_0x4893cf);function _0x48061b(){const _0x557ff2=_0x1e0f39;_0x4893cf[_0x557ff2(0x131)]();}return{'root':_0x5c3b0a,'close':_0x48061b};}function _0x6ea2(_0x57fddf,_0xcfabf0){_0x57fddf=_0x57fddf-0x118;const _0x2c9a84=_0x2726();let _0x26e58c=_0x2c9a84[_0x57fddf];return _0x26e58c;}export function confirmModal(_0x18d5af,_0x4511e3,_0x245c98,_0x13ad65){const _0x4838e8=_0x1ac049,_0x47c6a4={'RZEkA':function(_0x201fa8){return _0x201fa8();},'lBEtZ':function(_0xe8a560,_0x23d4d6){return _0xe8a560(_0x23d4d6);},'gSDVl':function(_0x50624f,_0x550512){return _0x50624f+_0x550512;},'lmLsM':function(_0x36c810,_0x5d3b8e){return _0x36c810+_0x5d3b8e;},'HONVv':function(_0x157183,_0x37f970){return _0x157183+_0x37f970;},'DabFu':_0x4838e8(0x11d),'emImn':function(_0x2eb5b5,_0x32c626){return _0x2eb5b5||_0x32c626;}},_0x38b337=_0x47c6a4[_0x4838e8(0x13e)](openModal,_0x47c6a4[_0x4838e8(0x12a)](_0x47c6a4['lmLsM'](_0x47c6a4[_0x4838e8(0x191)](_0x47c6a4[_0x4838e8(0x15c)](_0x47c6a4['gSDVl'](_0x47c6a4[_0x4838e8(0x12a)](_0x47c6a4[_0x4838e8(0x15c)](_0x4838e8(0x133)+esc(_0x18d5af),_0x4838e8(0x182))+_0x4838e8(0x13c),esc(_0x4511e3)),'</p>'),_0x4838e8(0x184))+_0x47c6a4[_0x4838e8(0x164)],_0x4838e8(0x150))+_0x47c6a4[_0x4838e8(0x13e)](esc,_0x47c6a4[_0x4838e8(0x12f)](_0x13ad65,'确定')),_0x4838e8(0x147)),_0x4838e8(0x11c)));return _0x38b337[_0x4838e8(0x186)]['querySelector'](_0x4838e8(0x183))[_0x4838e8(0x16d)]=_0x38b337['close'],_0x38b337[_0x4838e8(0x186)]['querySelector'](_0x4838e8(0x162))[_0x4838e8(0x16d)]=()=>{const _0x2febab=_0x4838e8;_0x38b337[_0x2febab(0x194)](),_0x47c6a4[_0x2febab(0x160)](_0x245c98);},_0x38b337;}
+﻿// ui.js —— 通用 UI / 工具函数
+
+export const $ = (sel, root) => (root || document).querySelector(sel);
+export const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
+
+export function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+export function toast(msg, ms) {
+  ms = ms || 2200;
+  const root = $('#toast-root');
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  root.appendChild(t);
+  setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity .4s'; }, ms - 400);
+  setTimeout(() => t.remove(), ms);
+}
+
+export function todayKey() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+export function fmtClock(ts) {
+  const d = new Date(ts);
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+// 在一起天数：返回 {days, hours, mins, secs}
+export function daysTogether(anniversary) {
+  const p = String(anniversary || '').split('-').map(Number);
+  if (p.length !== 3 || p.some(isNaN)) return { days: 0, hours: 0, mins: 0, secs: 0 };
+  const start = new Date(p[0], p[1] - 1, p[2], 0, 0, 0);
+  let diff = Date.now() - start.getTime();
+  if (diff < 0) diff = 0;
+  const secs = Math.floor(diff / 1000);
+  return {
+    days: Math.floor(secs / 86400),
+    hours: Math.floor((secs % 86400) / 3600),
+    mins: Math.floor((secs % 3600) / 60),
+    secs: secs % 60
+  };
+}
+
+// 图片压缩（canvas）→ dataURL；失败时给出友好提示
+export function compressImage(file, maxDim, quality) {
+  quality = quality == null ? 0.85 : quality;
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const raw = reader.result;
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+          const w = Math.max(1, Math.round(img.width * scale));
+          const h = Math.max(1, Math.round(img.height * scale));
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        } catch (err) {
+          // canvas 被污染或转换失败 → 图片不大时退回原图，否则提示换一张
+          if (raw && raw.length < 4.5 * 1024 * 1024) resolve(raw);
+          else reject(new Error('图片处理失败，请换一张试试'));
+        }
+      };
+      img.onerror = () => reject(new Error('图片解析失败：如果是 iPhone 的 HEIC 照片，请先在相册里转成 JPEG/PNG 再上传'));
+      img.src = raw;
+    };
+    reader.onerror = () => reject(new Error('文件读取失败'));
+    reader.readAsDataURL(file);
+  });
+}
+
+// 音频文件 → dataURL（客户端限制大小，服务端还会再校验）
+export function readAudioDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    if (!/^audio\//.test(file.type)) { reject(new Error('请选择音频文件（mp3/m4a/ogg/wav）')); return; }
+    if (file.size > 8 * 1024 * 1024) { reject(new Error('音频不能超过 8MB')); return; }
+    const reader = new FileReader();
+    reader.onload = () => resolve({ dataUrl: reader.result, name: file.name.replace(/\.[^.]+$/, '').slice(0, 60) });
+    reader.onerror = () => reject(new Error('文件读取失败'));
+    reader.readAsDataURL(file);
+  });
+}
+
+export function avatarHtml(member, cls) {
+  if (member && member.avatar) {
+    return '<img class="' + (cls || 'avatar') + '" src="' + member.avatar + '" alt="头像" />';
+  }
+  return '<div class="' + (cls || 'avatar') + ' avatar-fallback">' + (member && member.role === 'girl' ? '👧' : '🧑') + '</div>';
+}
+
+// 简单弹窗：html 为内容；返回 {root, close}
+export function openModal(html) {
+  const mask = document.createElement('div');
+  mask.className = 'modal-mask';
+  mask.innerHTML = '<div class="modal">' + html + '</div>';
+  const modal = mask.firstChild;
+  mask.addEventListener('click', (e) => { if (e.target === mask) close(); });
+  $('#modal-root').appendChild(mask);
+  function close() { mask.remove(); }
+  return { root: modal, close };
+}
+
+export function confirmModal(title, text, onOk, okLabel) {
+  const m = openModal(
+    '<h3>' + esc(title) + '</h3>' +
+    '<p class="muted" style="font-size:14px;line-height:1.7;">' + esc(text) + '</p>' +
+    '<div class="modal-actions">' +
+    '<button class="btn-ghost" id="m-cancel">再想想</button>' +
+    '<button class="btn-primary" id="m-ok">' + esc(okLabel || '确定') + '</button>' +
+    '</div>'
+  );
+  m.root.querySelector('#m-cancel').onclick = m.close;
+  m.root.querySelector('#m-ok').onclick = () => { m.close(); onOk(); };
+  return m;
+}

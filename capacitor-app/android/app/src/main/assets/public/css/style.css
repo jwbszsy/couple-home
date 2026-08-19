@@ -771,3 +771,13 @@ body, #bg {
 .nav-btn.has-unread .nav-ico::after { content:''; position:absolute; top:-1px; right:-4px; width:9px; height:9px; border-radius:50%; background:#fb4d6d; border:2px solid #fff; }
 .nav-ico { font-size:18px; }
 .nav-txt { font-size:10px; }
+/* 音乐状态条移到右上角（悬浮小胶囊） */
+.musicbar {
+  left: auto; right: 12px; bottom: auto; transform: none;
+  top: calc(52px + env(safe-area-inset-top));
+  width: auto; max-width: 240px;
+  padding: 6px 10px;
+}
+.musicbar .mb-btn { width: 30px; height: 30px; font-size: 13px; }
+.musicbar .mb-sub { display: none; }
+.musicbar .mb-title { max-width: 120px; font-size: 12.5px; }
