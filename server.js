@@ -100,6 +100,25 @@ function adminTokenOk(token) {
   return !!e && e > Date.now();
 }
 
+// ---------------- 简易限流（防暴力破解/刷接口） ----------------
+const rateBuckets = new Map();
+function rateLimit(ip, key, max, windowMs) {
+  const k = ip + ':' + key;
+  const now = Date.now();
+  const b = rateBuckets.get(k);
+  if (!b || now - b.ts > windowMs) {
+    rateBuckets.set(k, { ts: now, count: 1 });
+    return true;
+  }
+  b.count++;
+  return b.count <= max;
+}
+function clientIp(req) {
+  const fwd = req.headers['x-forwarded-for'];
+  if (fwd) { const first = String(fwd).split(',')[0].trim(); if (first) return first; }
+  return req.socket.remoteAddress || '0.0.0.0';
+}
+
 // ---------------- 使用统计（每日活跃等） ----------------
 let stats = { daily: {}, flagged: [] };
 const STATS_FILE = path.join(DATA_DIR, 'stats.json');
@@ -361,6 +380,11 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname.startsWith('/api/')) {
+    const rip = clientIp(req);
+    if (!rateLimit(rip, 'all', 120, 60000)) return fail(res, 429, '请求太频繁，请稍后再试');
+    if (req.method === 'POST' && (pathname === '/api/pair/create' || pathname === '/api/restore' || pathname === '/api/admin/login')) {
+      if (!rateLimit(rip, 'sensitive', 20, 600000)) return fail(res, 429, '操作太频繁，请稍后再试');
+    }
     try {
       const body = req.method === 'POST' ? await readBody(req) : {};
       routeApi(req.method, pathname, body, res);
