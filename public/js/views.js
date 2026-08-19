@@ -47,6 +47,7 @@ export function render(view, ctx) {
   v.classList.toggle('anim-in', switched);
   const html = VIEWS[view] ? VIEWS[view](ctx) : '<div class="empty">页面不存在</div>';
   v.innerHTML = html;
+  const ep0 = document.querySelector('.emoji-panel'); if (ep0) ep0.remove();
   $$('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
   const unread = ((state.pair.chat && state.pair.chat.messages) || []).filter((m) => m.fromMemberId !== state.me.id && !m.revoked && m.ts > (state.me.chatReadTs || 0)).length;
   $$('.nav-btn').forEach((b) => { if (b.dataset.view === 'chat') b.classList.toggle('has-unread', unread > 0); });
@@ -1122,12 +1123,23 @@ function editProfileModal(ctx) {
 }
 
 // ---------- 私密聊天（端到端加密） ----------
+const EMOJI_CATS = [
+  { name: '😊', list: ['😀','😄','😁','😆','😅','😂','🤣','😊','😇','🙂','😉','😍','🥰','😘','😜','🤪','😎','🤩','🥳','😢','😭','😤','😡','😱','😴','🤗','🤔','🙄','😬','🤫'] },
+  { name: '❤️', list: ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','💕','💞','💓','💗','💖','💘','💝','💟','♥️','💌','💋','😻','💞','🩷','🩵','🩶'] },
+  { name: '👍', list: ['👍','👎','👌','✌️','🤞','🤟','🤘','👏','🙌','👐','🤝','🙏','💪','👊','✊','🤙','👆','👇','👉','👈','✋','🖐️','🤏','🫶','💅'] },
+  { name: '🐱', list: ['🐱','🐶','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🐔','🐧','🐦','🐤','🦄','🐝','🦋','🐢','🐙','🦀','🐬','🐳','🦭','🐹','🐭'] },
+  { name: '🍎', list: ['🍎','🍐','🍊','🍋','🍌','🍉','🍇','🍓','🫐','🍒','🍑','🥭','🍍','🥥','🥝','🍅','🥑','🍔','🍟','🍕','🌭','🍿','🧁','🍰','🎂','🍦','🍩','🍪','☕','🧋','🍜','🍱'] },
+  { name: '🎉', list: ['🎉','🎊','🎈','🎁','🎀','🏆','🥇','🎯','🎮','🎲','🎸','🎹','🥁','🎤','🎧','🎬','🎨','🚀','✈️','🌈','⭐','🌟','✨','🔥','💥','⚡','💧','☀️','🌙','🌸'] },
+  { name: '💎', list: ['💎','💰','💳','⌚','📱','💻','📷','🔑','🔒','💡','🔔','⏰','📖','✏️','📌','📎','✂️','🧸','🪀','🛍️','💼','🔋','⚙️','🧩','🎒','🕶️'] },
+  { name: '✨', list: ['✨','💯','❣️','💤','💢','💦','💨','🆗','🆒','🆕','✅','❌','⭕','❗','❓','🉑','💫','🎵','🎶','♻️','🔞','💮','🈯','💬','💭','👀','🫶','🤷','🙆','🙅'] }
+];
 function chatHtml(ctx) {
   const { pair, me } = ctx.state;
   const msgs = (pair.chat && pair.chat.messages) || [];
   return '<div class="chat-top">🔒 私密聊天 <span class="muted small">端到端加密 · 仅你们可见</span></div>' +
     '<div class="chat-list" id="chat-list">' + msgs.map((m) => chatMsgHtml(pair, me, m)).join('') + '</div>' +
     '<div class="chat-input-bar">' +
+    '<button class="chat-btn" id="chat-emoji" title="表情">😊</button>' +
     '<button class="chat-btn" id="chat-img" title="图片">📷</button>' +
     '<button class="chat-btn" id="chat-voice" title="语音">🎤</button>' +
     '<input id="chat-text" maxlength="500" placeholder="说点什么…" autocomplete="off" />' +
@@ -1177,7 +1189,42 @@ async function bindChat(ctx) {
 
   const input = $('#chat-text');
   input.value = chatInputKeep;
-  input.addEventListener('input', () => { chatInputKeep = input.value; });
+  let emojiPanel = null;
+  const closeEmoji = () => { if (emojiPanel) { emojiPanel.remove(); emojiPanel = null; } };
+  input.addEventListener('input', () => { chatInputKeep = input.value; closeEmoji(); });
+  const emojiBtn = $('#chat-emoji');
+  if (emojiBtn) {
+    emojiBtn.onclick = (e) => {
+      e.stopPropagation();
+      if (emojiPanel) { closeEmoji(); return; }
+      emojiPanel = document.createElement('div');
+      emojiPanel.className = 'emoji-panel';
+      emojiPanel.innerHTML =
+        '<div class="emoji-cats">' + EMOJI_CATS.map((c, i) => '<button type="button" data-ci="' + i + '" class="' + (i === 0 ? 'on' : '') + '">' + c.name + '</button>').join('') + '</div>' +
+        '<div class="emoji-grid"></div>';
+      document.body.appendChild(emojiPanel);
+      const grid = emojiPanel.querySelector('.emoji-grid');
+      const renderGrid = (ci) => { grid.innerHTML = EMOJI_CATS[ci].list.map((em) => '<button type="button" data-e="' + em + '">' + em + '</button>').join(''); };
+      renderGrid(0);
+      emojiPanel.querySelectorAll('.emoji-cats button').forEach((b) => {
+        b.onclick = () => {
+          emojiPanel.querySelectorAll('.emoji-cats button').forEach((x) => x.classList.remove('on'));
+          b.classList.add('on');
+          renderGrid(Number(b.dataset.ci));
+        };
+      });
+      grid.addEventListener('click', (ev) => {
+        const b = ev.target.closest('button[data-e]');
+        if (!b) return;
+        input.value += b.dataset.e;
+        chatInputKeep = input.value;
+        input.focus();
+      });
+    };
+    document.addEventListener('pointerdown', (ev) => {
+      if (emojiPanel && !emojiPanel.contains(ev.target) && ev.target !== emojiBtn) closeEmoji();
+    });
+  }
   const doSend = async () => {
     const text = input.value.trim();
     if (!text) return;
