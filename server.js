@@ -100,6 +100,44 @@ function adminTokenOk(token) {
   return !!e && e > Date.now();
 }
 
+// ---------------- 使用统计（每日活跃等） ----------------
+let stats = { daily: {} };
+const STATS_FILE = path.join(DATA_DIR, 'stats.json');
+try { stats = JSON.parse(fs.readFileSync(STATS_FILE, 'utf8')); } catch (e) { /* 首次运行 */ }
+let statsSaveQueued = false;
+function saveStats() {
+  if (statsSaveQueued) return;
+  statsSaveQueued = true;
+  setImmediate(() => {
+    statsSaveQueued = false;
+    try {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+      const tmp = STATS_FILE + '.tmp';
+      fs.writeFileSync(tmp, JSON.stringify(stats));
+      fs.renameSync(tmp, STATS_FILE);
+    } catch (e) { /* 忽略 */ }
+  });
+}
+function todayStatsKey() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function markActive(memberId) {
+  const k = todayStatsKey();
+  const day = stats.daily[k] || (stats.daily[k] = { active: [], newPairs: 0 });
+  if (!day.active.includes(memberId)) day.active.push(memberId);
+  // 只保留最近 90 天
+  const keys = Object.keys(stats.daily).sort();
+  while (keys.length > 90) { delete stats.daily[keys.shift()]; }
+  saveStats();
+}
+function markNewPair() {
+  const k = todayStatsKey();
+  const day = stats.daily[k] || (stats.daily[k] = { active: [], newPairs: 0 });
+  day.newPairs++;
+  saveStats();
+}
+
 // 向对方推送通知（未启用或订阅失效时静默跳过）
 function sendPush(targetMember, title, body) {
   if (!webPush || !VAPID || !targetMember || !targetMember.pushSub) return;
@@ -181,7 +219,8 @@ function normalizePair(pair) {
   if (!pair.theme) pair.theme = 'pink';
   if (!pair.declaration) pair.declaration = '';
   if (!Array.isArray(pair.capsules)) pair.capsules = [];
-  for (const m of Object.values(pair.members || {})) { if (!m.missYou) m.missYou = null; if (!m.pushSub) m.pushSub = null; }
+  if (!pair.chat || !Array.isArray(pair.chat.messages)) pair.chat = { messages: [] };
+  for (const m of Object.values(pair.members || {})) { if (!m.missYou) m.missYou = null; if (!m.pushSub) m.pushSub = null; if (!m.chatReadTs) m.chatReadTs = 0; }
   for (const e of pair.entries) {
     if (!Array.isArray(e.comments)) e.comments = [];
     if (!e.tag) e.tag = null;
@@ -221,6 +260,7 @@ function requirePairMember(pairId, memberId) {
   if (!pair) return { error: '小屋不存在' };
   const member = pair.members[memberId];
   if (!member) return { error: '成员校验失败，请重新配对' };
+  markActive(memberId);
   return { pair, member };
 }
 function newMember(pairId, nickname, role) {
@@ -336,6 +376,21 @@ function routeApi(method, p, body, res) {
     const text = activations.codes.filter((x) => !x.used).map((x) => x.code).join('\n');
     return ok(res, { text });
   }
+  if (method === 'POST' && p === '/api/admin/stats/daily') {
+    if (!adminTokenOk(body.token)) return fail(res, 403, '请先登录');
+    const days = [];
+    const now = new Date();
+    for (let i = 29; i >= 0; i--) {
+      const dd = new Date(now.getTime() - i * 86400000);
+      const k = dd.getFullYear() + '-' + String(dd.getMonth() + 1).padStart(2, '0') + '-' + String(dd.getDate()).padStart(2, '0');
+      const day = stats.daily[k] || { active: [], newPairs: 0 };
+      days.push({ date: k, dau: day.active.length, newPairs: day.newPairs });
+    }
+    const pairCount = Object.keys(db.pairs).length;
+    const memberCount = Object.values(db.pairs).reduce((s, p) => s + Object.keys(p.members || {}).length, 0);
+    const usedCodes = activations.codes.filter((x) => x.used).length;
+    return ok(res, { days, totals: { pairs: pairCount, members: memberCount, codes: activations.codes.length, usedCodes } });
+  }
 
   // ---- 配对 ----
   if (method === 'POST' && p === '/api/pair/create') {
@@ -346,6 +401,7 @@ function routeApi(method, p, body, res) {
     const pair = newPair(body.nickname, 'boy');
     found.used = true; found.usedBy = pair.id; found.usedAt = Date.now();
     saveActivations();
+    markNewPair();
     save();
     return ok(res, { pairId: pair.id, memberId: Object.keys(pair.members)[0], code: pair.code, pair });
   }
@@ -573,6 +629,31 @@ function routeApi(method, p, body, res) {
     const capsuleId = String(body.capsuleId || '');
     const i = pair.capsules.findIndex((x) => x.id === capsuleId);
     if (i >= 0) { pair.capsules.splice(i, 1); changed(); }
+    return ok(res, { pair, memberId });
+  }
+  if (method === 'POST' && p === '/api/chat/send') {
+    const kind = (body.kind === 'image' || body.kind === 'voice') ? body.kind : 'text';
+    const iv = String(body.iv || '');
+    const ct = String(body.ct || '');
+    if (!iv || !ct) return fail(res, 400, '消息内容无效');
+    if (!pair.chat) pair.chat = { messages: [] };
+    const msg = { id: uid('m'), fromMemberId: memberId, kind, iv, ct, ts: Date.now(), revoked: false };
+    pair.chat.messages.push(msg);
+    if (pair.chat.messages.length > 500) pair.chat.messages = pair.chat.messages.slice(-500);
+    const partner = Object.values(pair.members).find((m) => m.id !== memberId);
+    sendPush(partner, member.nickname + ' 发来一条消息 💬', kind === 'text' ? '（端到端加密）' : kind === 'image' ? '[图片]' : '[语音]');
+    changed();
+    return ok(res, { pair, memberId });
+  }
+  if (method === 'POST' && p === '/api/chat/revoke') {
+    const msg = pair.chat.messages.find((m) => m.id === body.messageId);
+    if (msg && msg.fromMemberId === memberId) msg.revoked = true;
+    changed();
+    return ok(res, { pair, memberId });
+  }
+  if (method === 'POST' && p === '/api/chat/read') {
+    member.chatReadTs = Math.max(member.chatReadTs || 0, Number(body.ts) || Date.now());
+    save(); // 只落盘不广播，避免已读上报触发本页自循环重渲染
     return ok(res, { pair, memberId });
   }
   if (method === 'POST' && p === '/api/push/subscribe') {

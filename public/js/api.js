@@ -44,6 +44,10 @@ export function adminLogin(password) { return post('/api/admin/login', { passwor
 export function adminStats(token) { return post('/api/admin/stats', { token }); }
 export function adminGenerate(token, count) { return post('/api/admin/codes/generate', { token, count }); }
 export function adminExport(token) { return post('/api/admin/codes/export', { token }); }
+export function adminDaily(token) { return post('/api/admin/stats/daily', { token }); }
+export function chatSend(pairId, memberId, kind, iv, ct) { return post('/api/chat/send', { pairId, memberId, kind, iv, ct }); }
+export function chatRevoke(pairId, memberId, messageId) { return post('/api/chat/revoke', { pairId, memberId, messageId }); }
+export function chatRead(pairId, memberId, ts) { return post('/api/chat/read', { pairId, memberId, ts }); }
 export function missYou(pairId, memberId) { return post('/api/miss', { pairId, memberId }); }
 export function setTheme(pairId, memberId, theme) { return post('/api/theme', { pairId, memberId, theme }); }
 export function setDeclaration(pairId, memberId, text) { return post('/api/declaration', { pairId, memberId, text }); }

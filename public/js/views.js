@@ -5,6 +5,7 @@ import {
   readAudioDataUrl, avatarHtml, openModal, confirmModal
 } from './ui.js';
 import * as api from './api.js';
+import { encryptText, decryptText } from './chat-crypto.js';
 
 const MOODS = [
   ['😄', '开心'], ['🥰', '想你'], ['😊', '平静'], ['😋', '吃货'],
@@ -47,6 +48,8 @@ export function render(view, ctx) {
   const html = VIEWS[view] ? VIEWS[view](ctx) : '<div class="empty">页面不存在</div>';
   v.innerHTML = html;
   $$('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
+  const unread = ((state.pair.chat && state.pair.chat.messages) || []).filter((m) => m.fromMemberId !== state.me.id && !m.revoked && m.ts > (state.me.chatReadTs || 0)).length;
+  $$('.nav-btn').forEach((b) => { if (b.dataset.view === 'chat') b.classList.toggle('has-unread', unread > 0); });
   if (BIND[view]) BIND[view](ctx);
 }
 
@@ -1118,5 +1121,104 @@ function editProfileModal(ctx) {
   };
 }
 
-const VIEWS = { home: homeHtml, timeline: timelineHtml, todo: todoHtml, music: musicHtml, profile: profileHtml };
-const BIND = { home: bindHome, timeline: bindTimeline, todo: bindTodo, music: bindMusic, profile: bindProfile };
+// ---------- 私密聊天（端到端加密） ----------
+function chatHtml(ctx) {
+  const { pair, me } = ctx.state;
+  const msgs = (pair.chat && pair.chat.messages) || [];
+  return '<div class="chat-top">🔒 私密聊天 <span class="muted small">端到端加密 · 仅你们可见</span></div>' +
+    '<div class="chat-list" id="chat-list">' + msgs.map((m) => chatMsgHtml(pair, me, m)).join('') + '</div>' +
+    '<div class="chat-input-bar">' +
+    '<button class="chat-btn" id="chat-img" title="图片">📷</button>' +
+    '<button class="chat-btn" id="chat-voice" title="语音">🎤</button>' +
+    '<input id="chat-text" maxlength="500" placeholder="说点什么…" autocomplete="off" />' +
+    '<button class="chat-send" id="chat-send">发送</button>' +
+    '</div>';
+}
+
+function chatMsgHtml(pair, me, m) {
+  const mine = m.fromMemberId === me.id;
+  const from = pair.members[m.fromMemberId] || { nickname: '??' };
+  const body = m.revoked
+    ? '<div class="chat-revoked">已撤回一条消息</div>'
+    : '<div class="chat-cipher" data-cid="' + m.id + '">🔒 加密消息…</div>';
+  return '<div class="chat-msg ' + (mine ? 'mine' : 'theirs') + '" data-cid="' + m.id + '">' +
+    (mine && !m.revoked ? '<button class="chat-revoke" data-revoke="' + m.id + '" title="撤回">↩</button>' : '') +
+    '<div class="chat-bubble">' + body + '</div>' +
+    '<div class="chat-meta">' + (mine ? '' : esc(from.nickname) + ' · ') + fmtClock(m.ts) + '</div>' +
+    '</div>';
+}
+
+let chatInputKeep = '';
+async function bindChat(ctx) {
+  const { pair, me } = ctx.state;
+  const code = pair.code;
+  const msgsAll = (pair.chat && pair.chat.messages) || [];
+  const unread = msgsAll.filter((m) => m.fromMemberId !== me.id && !m.revoked && m.ts > (me.chatReadTs || 0)).length;
+  if (unread > 0) api.chatRead(pair.id, me.id, Date.now()).catch(() => {});
+  const msgs = (pair.chat && pair.chat.messages) || [];
+  for (const m of msgs) {
+    if (m.revoked) continue;
+    const el = document.querySelector('.chat-cipher[data-cid="' + m.id + '"]');
+    try {
+      const plain = await decryptText(code, m.iv, m.ct);
+      if (m.kind === 'text') { if (el) el.textContent = plain; }
+      else {
+        const bubble = document.querySelector('.chat-msg[data-cid="' + m.id + '"] .chat-bubble');
+        if (bubble) {
+          bubble.innerHTML = m.kind === 'image'
+            ? '<img class="chat-img viewable-img" data-src="' + plain + '" src="' + plain + '" alt="图片" />'
+            : '<audio class="chat-audio" controls preload="metadata" src="' + plain + '"></audio>';
+        }
+      }
+    } catch (e) { if (el) el.textContent = '⚠️ 无法解密（可能房间码已更换）'; }
+  }
+  const list = $('#chat-list');
+  if (list) list.scrollTop = list.scrollHeight;
+
+  const input = $('#chat-text');
+  input.value = chatInputKeep;
+  input.addEventListener('input', () => { chatInputKeep = input.value; });
+  const doSend = async () => {
+    const text = input.value.trim();
+    if (!text) return;
+    try {
+      const { iv, ct } = await encryptText(code, text);
+      await api.chatSend(pair.id, me.id, 'text', iv, ct);
+      input.value = '';
+    } catch (e) { toast(e.message); }
+  };
+  $('#chat-send').onclick = doSend;
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSend(); } });
+
+  $('#chat-img').onclick = () => {
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'image/*';
+    inp.onchange = async () => {
+      const f = inp.files && inp.files[0];
+      if (!f) return;
+      try {
+        const dataUrl = await compressImage(f, 900, 0.82);
+        const { iv, ct } = await encryptText(code, dataUrl);
+        await api.chatSend(pair.id, me.id, 'image', iv, ct);
+      } catch (e) { toast(e.message); }
+    };
+    inp.click();
+  };
+  $('#chat-voice').onclick = () => {
+    recordVoice(async (dataUrl) => {
+      try {
+        const { iv, ct } = await encryptText(code, dataUrl);
+        await api.chatSend(pair.id, me.id, 'voice', iv, ct);
+      } catch (e) { toast(e.message); }
+    }, (err) => toast(err.message));
+  };
+  $$('.chat-revoke', $('#view')).forEach((b) => {
+    b.onclick = async () => {
+      try { const d = await api.chatRevoke(pair.id, me.id, b.dataset.revoke); ctx.apply(d.pair); }
+      catch (e) { toast(e.message); }
+    };
+  });
+}
+
+const VIEWS = { home: homeHtml, timeline: timelineHtml, todo: todoHtml, music: musicHtml, chat: chatHtml, profile: profileHtml };
+const BIND = { home: bindHome, timeline: bindTimeline, todo: bindTodo, music: bindMusic, chat: bindChat, profile: bindProfile };

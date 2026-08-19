@@ -26,6 +26,12 @@
   .codes div { display:flex; justify-content:space-between; padding:6px 8px; border-bottom:1px dashed rgba(255,179,198,.4); }
   .used { color:#a6808c; text-decoration:line-through; }
   .muted { color:#a6808c; font-size:12px; }
+  .totals { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:12px; font-size:12.5px; color:#5b3a44; }
+  .totals b { color:#fb6f92; font-size:15px; }
+  .bars { display:flex; align-items:flex-end; gap:3px; height:92px; margin-bottom:18px; }
+  .bar { flex:1; background:linear-gradient(180deg,#ff8fab,#fb6f92); border-radius:4px 4px 0 0; min-height:2px; position:relative; transition:height .4s; }
+  .bar span { position:absolute; bottom:-15px; left:50%; transform:translateX(-50%); font-size:9px; color:#a6808c; white-space:nowrap; }
+  .sec { font-weight:800; font-size:13px; margin:4px 0 8px; }
   .hidden { display:none !important; }
 </style>
 </head>
@@ -44,6 +50,11 @@
       <div class="stat"><b id="s-used">-</b><span>已使用</span></div>
       <div class="stat"><b id="s-left">-</b><span>剩余</span></div>
     </div>
+    <div class="totals" id="totals"></div>
+    <div class="sec">📊 每日活跃人数（近 14 天）</div>
+    <div class="bars" id="dau-bars"></div>
+    <div class="sec">🏠 每日新建小屋（近 14 天）</div>
+    <div class="bars" id="pair-bars"></div>
     <div class="row">
       <button class="ghost" id="export-btn" style="flex:1;">📤 导出未用码</button>
     </div>
@@ -65,6 +76,21 @@ async function post(path, body) {
   return j.data;
 }
 function fmt(ts) { if (!ts) return ''; const d = new Date(ts); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); }
+function barsHtml(arr, key) {
+  const last = arr.slice(-14);
+  const max = Math.max(1, ...last.map((x) => x[key]));
+  return last.map((x) => {
+    const h = Math.max(2, Math.round((x[key] / max) * 88));
+    const label = String(x.date).slice(5).replace('-', '/');
+    return '<div class="bar" style="height:' + h + 'px;" title="' + x.date + ' · ' + x[key] + '"><span>' + label + '</span></div>';
+  }).join('');
+}
+function renderDaily(dl) {
+  $('#totals').innerHTML =
+    '小屋 <b>' + dl.totals.pairs + '</b> ｜ 用户 <b>' + dl.totals.members + '</b> ｜ 激活码 <b>' + dl.totals.usedCodes + '/' + dl.totals.codes + '</b>';
+  $('#dau-bars').innerHTML = barsHtml(dl.days, 'dau');
+  $('#pair-bars').innerHTML = barsHtml(dl.days, 'newPairs');
+}
 async function load() {
   try {
     const s = await post('/api/admin/stats', { token });
@@ -72,6 +98,8 @@ async function load() {
     $('#code-list').innerHTML = s.codes.slice().reverse().map((x) =>
       '<div class="' + (x.used ? 'used' : '') + '"><span>' + x.code + '</span><span>' + (x.used ? ('已用 ' + fmt(x.usedAt)) : '未用') + '</span></div>'
     ).join('');
+    const dl = await post('/api/admin/stats/daily', { token });
+    renderDaily(dl);
   } catch (e) {
     token = ''; localStorage.removeItem('admin_token');
     $('#login-card').classList.remove('hidden'); $('#main-card').classList.add('hidden');
