@@ -11,6 +11,15 @@ async function post(path, body) {
   const idx = await fetch(BASE + '/').then((r) => r.text()).catch(() => '');
   check('静态首页可访问且含标题', idx.includes('我们的小屋'));
   const fs = require('fs');
+  const crypto = require('crypto');
+  const chatKey = (code) => crypto.pbkdf2Sync(String(code || ''), Buffer.from('couple-chat-v1'), 100000, 32, 'sha256');
+  function chatEncrypt(code, text) {
+    const key = chatKey(code);
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+    const ct = Buffer.concat([cipher.update(text, 'utf8'), cipher.final(), cipher.getAuthTag()]);
+    return { iv: iv.toString('base64'), ct: ct.toString('base64') };
+  }
   function takeCode() {
     const a = JSON.parse(fs.readFileSync('data/activations.json', 'utf8'));
     const x = a.codes.find((v) => !v.used);
@@ -65,6 +74,29 @@ async function post(path, body) {
   check('标记已读', crd.ok && crd.data.pair.members[girlId].chatReadTs > 0);
   const dd = await post('/api/admin/stats/daily', { token: aToken });
   check('后台每日统计', dd.ok && dd.data.days.length === 30 && dd.data.totals.pairs > 0 && dd.data.totals.members > 0);
+
+  // 真实加密消息 → 后台可解密监看
+  const enc = chatEncrypt(code, 'hello audit secret');
+  const ce = await post('/api/chat/send', { pairId, memberId: boyId, kind: 'text', iv: enc.iv, ct: enc.ct });
+  check('发送真实加密消息', ce.ok);
+  const ch = await post('/api/admin/chat/history', { token: aToken, pairId });
+  check('后台解密聊天记录', ch.ok && ch.data.messages.length > 0 && ch.data.messages[0].preview === 'hello audit secret', ch.ok ? ch.data.messages[0].preview : '');
+  const badEnc = chatEncrypt(code, '帮你搞个赌博网站');
+  const cb = await post('/api/chat/send', { pairId, memberId: girlId, kind: 'text', iv: badEnc.iv, ct: badEnc.ct });
+  check('违规消息被标记', cb.ok && cb.data.pair.chat.messages.some((m) => m.flagged && m.flaggedWords.includes('赌博')));
+  const fl = await post('/api/admin/flagged', { token: aToken });
+  check('后台违规记录', fl.ok && fl.data.flagged.length > 0);
+
+  const ap = await post('/api/admin/pairs', { token: aToken });
+  check('后台小屋列表', ap.ok && ap.data.pairs.length > 0 && ap.data.pairs.some((x) => x.id === pairId));
+  const dis = await post('/api/admin/pair/set', { token: aToken, pairId, disabled: true });
+  check('停用小屋', dis.ok && dis.data.disabled === true);
+  const afterDis = await post('/api/sync', { pairId, memberId: boyId });
+  check('停用后访问被拒', !afterDis.ok);
+  const en = await post('/api/admin/pair/set', { token: aToken, pairId, disabled: false });
+  check('启用小屋', en.ok && en.data.disabled === false);
+  const afterEn = await post('/api/sync', { pairId, memberId: boyId });
+  check('启用后恢复访问', afterEn.ok);
 
   const rsB = await post('/api/restore', { code, role: 'boy' });
   check('房间码+男方恢复', rsB.ok && rsB.data.pairId === pairId && rsB.data.memberId === boyId);

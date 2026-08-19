@@ -101,9 +101,11 @@ function adminTokenOk(token) {
 }
 
 // ---------------- 使用统计（每日活跃等） ----------------
-let stats = { daily: {} };
+let stats = { daily: {}, flagged: [] };
 const STATS_FILE = path.join(DATA_DIR, 'stats.json');
 try { stats = JSON.parse(fs.readFileSync(STATS_FILE, 'utf8')); } catch (e) { /* 首次运行 */ }
+if (!stats.daily) stats.daily = {};
+if (!stats.flagged) stats.flagged = [];
 let statsSaveQueued = false;
 function saveStats() {
   if (statsSaveQueued) return;
@@ -135,6 +137,32 @@ function markNewPair() {
   const k = todayStatsKey();
   const day = stats.daily[k] || (stats.daily[k] = { active: [], newPairs: 0 });
   day.newPairs++;
+  saveStats();
+}
+
+// ---------------- 聊天审核（服务器端可解密，用于合规监看） ----------------
+const SENSITIVE_WORDS = ['赌博','博彩','网赌','菠菜','杀猪盘','诈骗','洗钱','刷单','裸聊','招嫖','卖淫','嫖娼','冰毒','海洛因','毒品','迷药','枪支','弹药','买卖器官','代孕','假钞','发票代开','办证','约炮','赌博网'];
+const CHAT_SALT = Buffer.from('couple-chat-v1');
+function chatKeyFromCode(code) {
+  return crypto.pbkdf2Sync(String(code || ''), CHAT_SALT, 100000, 32, 'sha256');
+}
+function chatDecrypt(code, ivB64, ctB64) {
+  const key = chatKeyFromCode(code);
+  const iv = Buffer.from(ivB64, 'base64');
+  const data = Buffer.from(ctB64, 'base64');
+  const tag = data.slice(data.length - 16);
+  const ct = data.slice(0, data.length - 16);
+  const d = crypto.createDecipheriv('aes-256-gcm', key, iv);
+  d.setAuthTag(tag);
+  return Buffer.concat([d.update(ct), d.final()]).toString('utf8');
+}
+function checkSensitive(text) {
+  return SENSITIVE_WORDS.filter((w) => text.includes(w));
+}
+function markFlagged(pairId, memberId, words) {
+  if (!stats.flagged) stats.flagged = [];
+  stats.flagged.push({ pairId, memberId, words, ts: Date.now() });
+  if (stats.flagged.length > 200) stats.flagged = stats.flagged.slice(-200);
   saveStats();
 }
 
@@ -220,6 +248,7 @@ function normalizePair(pair) {
   if (!pair.declaration) pair.declaration = '';
   if (!Array.isArray(pair.capsules)) pair.capsules = [];
   if (!pair.chat || !Array.isArray(pair.chat.messages)) pair.chat = { messages: [] };
+  if (!pair.disabled) pair.disabled = false;
   for (const m of Object.values(pair.members || {})) { if (!m.missYou) m.missYou = null; if (!m.pushSub) m.pushSub = null; if (!m.chatReadTs) m.chatReadTs = 0; }
   for (const e of pair.entries) {
     if (!Array.isArray(e.comments)) e.comments = [];
@@ -258,8 +287,10 @@ function getPair(pairId) { const pair = db.pairs[pairId]; return pair ? normaliz
 function requirePairMember(pairId, memberId) {
   const pair = getPair(pairId);
   if (!pair) return { error: '小屋不存在' };
+  if (pair.disabled) return { error: '小屋已被停用，请联系管理员' };
   const member = pair.members[memberId];
   if (!member) return { error: '成员校验失败，请重新配对' };
+  pair.lastActive = Date.now();
   markActive(memberId);
   return { pair, member };
 }
@@ -376,6 +407,66 @@ function routeApi(method, p, body, res) {
     const text = activations.codes.filter((x) => !x.used).map((x) => x.code).join('\n');
     return ok(res, { text });
   }
+  if (method === 'POST' && p === '/api/admin/pairs') {
+    if (!adminTokenOk(body.token)) return fail(res, 403, '请先登录');
+    const list = Object.values(db.pairs).map((p) => {
+      const members = Object.values(p.members || {});
+      const creator = members.find((m) => m.role === 'boy') || members[0] || null;
+      return {
+        id: p.id,
+        createdAt: p.createdAt,
+        lastActive: p.lastActive || null,
+        disabled: !!p.disabled,
+        creator: creator ? creator.nickname : null,
+        memberCount: members.length,
+        members: members.map((m) => ({ nickname: m.nickname, role: m.role })),
+        entries: (p.entries || []).length,
+        chatMsgs: ((p.chat && p.chat.messages) || []).length,
+        usedCode: (activations.codes.find((x) => x.used && x.usedBy === p.id) || {}).code || null
+      };
+    }).sort((a, b) => (b.createdAt - a.createdAt));
+    return ok(res, { pairs: list });
+  }
+  if (method === 'POST' && p === '/api/admin/pair/set') {
+    if (!adminTokenOk(body.token)) return fail(res, 403, '请先登录');
+    const pair = db.pairs[body.pairId];
+    if (!pair) return fail(res, 404, '小屋不存在');
+    pair.disabled = !!body.disabled;
+    save();
+    broadcast(body.pairId);
+    return ok(res, { pairId: body.pairId, disabled: pair.disabled });
+  }
+  if (method === 'POST' && p === '/api/admin/chat/history') {
+    if (!adminTokenOk(body.token)) return fail(res, 403, '请先登录');
+    const pair = db.pairs[body.pairId];
+    if (!pair) return fail(res, 404, '小屋不存在');
+    const messages = ((pair.chat && pair.chat.messages) || []).map((m) => {
+      let preview = '';
+      if (!m.revoked) {
+        try {
+          const plain = chatDecrypt(pair.code, m.iv, m.ct);
+          preview = m.kind === 'text' ? plain : (m.kind === 'image' ? '[图片]' : '[语音]');
+        } catch (e) { preview = '（无法解密）'; }
+      }
+      return {
+        id: m.id,
+        from: (pair.members[m.fromMemberId] || {}).nickname || '?',
+        kind: m.kind, ts: m.ts, revoked: !!m.revoked,
+        flagged: !!m.flagged, flaggedWords: m.flaggedWords || [],
+        preview
+      };
+    }).reverse();
+    return ok(res, { messages });
+  }
+  if (method === 'POST' && p === '/api/admin/flagged') {
+    if (!adminTokenOk(body.token)) return fail(res, 403, '请先登录');
+    const flagged = (stats.flagged || []).slice().reverse().map((x) => ({
+      pairId: x.pairId,
+      nickname: (db.pairs[x.pairId] && db.pairs[x.pairId].members[x.memberId]) ? db.pairs[x.pairId].members[x.memberId].nickname : null,
+      words: x.words, ts: x.ts
+    }));
+    return ok(res, { flagged });
+  }
   if (method === 'POST' && p === '/api/admin/stats/daily') {
     if (!adminTokenOk(body.token)) return fail(res, 403, '请先登录');
     const days = [];
@@ -410,6 +501,7 @@ function routeApi(method, p, body, res) {
     const role = body.role === 'girl' ? 'girl' : 'boy';
     const pair = Object.values(db.pairs).find((x) => x.code === code);
     if (!pair) return fail(res, 404, '房间码不存在，检查一下哦');
+    if (pair.disabled) return fail(res, 403, '小屋已被停用，请联系管理员');
     const member = Object.values(pair.members).find((m) => m.role === role);
     if (!member) return fail(res, 404, '这个房间还没有' + (role === 'girl' ? '女方' : '男方') + '的身份，请先用邀请码加入');
     return ok(res, { pairId: pair.id, memberId: member.id, nickname: member.nickname });
@@ -638,6 +730,12 @@ function routeApi(method, p, body, res) {
     if (!iv || !ct) return fail(res, 400, '消息内容无效');
     if (!pair.chat) pair.chat = { messages: [] };
     const msg = { id: uid('m'), fromMemberId: memberId, kind, iv, ct, ts: Date.now(), revoked: false };
+    if (kind === 'text') {
+      try {
+        const hit = checkSensitive(chatDecrypt(pair.code, iv, ct));
+        if (hit.length) { msg.flagged = true; msg.flaggedWords = hit; markFlagged(pair.id, memberId, hit); }
+      } catch (e) { /* 解密失败则跳过检测 */ }
+    }
     pair.chat.messages.push(msg);
     if (pair.chat.messages.length > 500) pair.chat.messages = pair.chat.messages.slice(-500);
     const partner = Object.values(pair.members).find((m) => m.id !== memberId);
