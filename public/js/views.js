@@ -1123,16 +1123,9 @@ function editProfileModal(ctx) {
 }
 
 // ---------- 私密聊天（端到端加密） ----------
-const EMOJI_CATS = [
-  { name: '😊', list: ['😀','😄','😁','😆','😅','😂','🤣','😊','😇','🙂','😉','😍','🥰','😘','😜','🤪','😎','🤩','🥳','😢','😭','😤','😡','😱','😴','🤗','🤔','🙄','😬','🤫'] },
-  { name: '❤️', list: ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','💕','💞','💓','💗','💖','💘','💝','💟','♥️','💌','💋','😻','💞','🩷','🩵','🩶'] },
-  { name: '👍', list: ['👍','👎','👌','✌️','🤞','🤟','🤘','👏','🙌','👐','🤝','🙏','💪','👊','✊','🤙','👆','👇','👉','👈','✋','🖐️','🤏','🫶','💅'] },
-  { name: '🐱', list: ['🐱','🐶','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🐔','🐧','🐦','🐤','🦄','🐝','🦋','🐢','🐙','🦀','🐬','🐳','🦭','🐹','🐭'] },
-  { name: '🍎', list: ['🍎','🍐','🍊','🍋','🍌','🍉','🍇','🍓','🫐','🍒','🍑','🥭','🍍','🥥','🥝','🍅','🥑','🍔','🍟','🍕','🌭','🍿','🧁','🍰','🎂','🍦','🍩','🍪','☕','🧋','🍜','🍱'] },
-  { name: '🎉', list: ['🎉','🎊','🎈','🎁','🎀','🏆','🥇','🎯','🎮','🎲','🎸','🎹','🥁','🎤','🎧','🎬','🎨','🚀','✈️','🌈','⭐','🌟','✨','🔥','💥','⚡','💧','☀️','🌙','🌸'] },
-  { name: '💎', list: ['💎','💰','💳','⌚','📱','💻','📷','🔑','🔒','💡','🔔','⏰','📖','✏️','📌','📎','✂️','🧸','🪀','🛍️','💼','🔋','⚙️','🧩','🎒','🕶️'] },
-  { name: '✨', list: ['✨','💯','❣️','💤','💢','💦','💨','🆗','🆒','🆕','✅','❌','⭕','❗','❓','🉑','💫','🎵','🎶','♻️','🔞','💮','🈯','💬','💭','👀','🫶','🤷','🙆','🙅'] }
-];
+const STICKERS = [];
+for (let i = 1; i <= 20; i++) { const id = 'st' + String(i).padStart(2, '0'); STICKERS.push({ id, file: id + '.webp' }); }
+
 function chatHtml(ctx) {
   const { pair, me } = ctx.state;
   const msgs = (pair.chat && pair.chat.messages) || [];
@@ -1174,6 +1167,10 @@ async function bindChat(ctx) {
     try {
       const plain = await decryptText(code, m.iv, m.ct);
       if (m.kind === 'text') { if (el) el.textContent = plain; }
+      else if (m.kind === 'sticker') {
+        const bubble = document.querySelector('.chat-msg[data-cid="' + m.id + '"] .chat-bubble');
+        if (bubble) bubble.innerHTML = '<img class="chat-sticker" src="stickers/' + plain + '.webp" alt="贴纸" />';
+      }
       else {
         const bubble = document.querySelector('.chat-msg[data-cid="' + m.id + '"] .chat-bubble');
         if (bubble) {
@@ -1203,33 +1200,24 @@ async function bindChat(ctx) {
       if (emojiPanel) { closeEmoji(); return; }
       emojiPanel = document.createElement('div');
       emojiPanel.className = 'emoji-panel';
-      emojiPanel.innerHTML =
-        '<div class="emoji-cats">' + EMOJI_CATS.map((c, i) => '<button type="button" data-ci="' + i + '" class="' + (i === 0 ? 'on' : '') + '">' + c.name + '</button>').join('') + '</div>' +
-        '<div class="emoji-grid"></div>';
+      emojiPanel.innerHTML = '<div class="emoji-grid sticker-grid">' +
+        STICKERS.map((s) => '<button type="button" data-id="' + s.id + '"><img src="stickers/' + s.file + '" alt="贴纸" /></button>').join('') +
+        '</div>';
       document.body.appendChild(emojiPanel);
-      const grid = emojiPanel.querySelector('.emoji-grid');
-      const renderGrid = (ci) => { grid.innerHTML = EMOJI_CATS[ci].list.map((em) => '<button type="button" data-e="' + em + '">' + em + '</button>').join(''); };
-      renderGrid(0);
-      emojiPanel.querySelectorAll('.emoji-cats button').forEach((b) => {
-        b.onclick = () => {
-          emojiPanel.querySelectorAll('.emoji-cats button').forEach((x) => x.classList.remove('on'));
-          b.classList.add('on');
-          renderGrid(Number(b.dataset.ci));
-        };
-      });
-      grid.addEventListener('click', (ev) => {
-        const b = ev.target.closest('button[data-e]');
+      emojiPanel.querySelector('.emoji-grid').addEventListener('click', async (ev) => {
+        const b = ev.target.closest('button[data-id]');
         if (!b) return;
-        input.value += b.dataset.e;
-        chatInputKeep = input.value;
-        input.focus();
+        try {
+          const { iv, ct } = await encryptText(code, b.dataset.id);
+          await api.chatSend(pair.id, me.id, 'sticker', iv, ct);
+          closeEmoji();
+        } catch (err) { toast(err.message); }
       });
     };
     document.addEventListener('pointerdown', (ev) => {
       if (emojiPanel && !emojiPanel.contains(ev.target) && ev.target !== emojiBtn) closeEmoji();
     });
-  }
-  const doSend = async () => {
+  }  const doSend = async () => {
     const text = input.value.trim();
     if (!text) return;
     try {

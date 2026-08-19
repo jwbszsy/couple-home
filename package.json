@@ -17,6 +17,7 @@
   },
   "devDependencies": {
     "javascript-obfuscator": "^5.5.0",
+    "lottie-web": "^5.13.0",
     "playwright-core": "^1.62.1"
   }
 }

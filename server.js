@@ -469,7 +469,7 @@ function routeApi(method, p, body, res) {
       if (!m.revoked) {
         try {
           const plain = chatDecrypt(pair.code, m.iv, m.ct);
-          preview = m.kind === 'text' ? plain : (m.kind === 'image' ? '[图片]' : '[语音]');
+          preview = m.kind === 'text' ? plain : (m.kind === 'image' ? '[图片]' : (m.kind === 'sticker' ? '[贴纸] ' + plain : '[语音]'));
         } catch (e) { preview = '（无法解密）'; }
       }
       return {
@@ -756,7 +756,7 @@ function routeApi(method, p, body, res) {
     return ok(res, { pair, memberId });
   }
   if (method === 'POST' && p === '/api/chat/send') {
-    const kind = (body.kind === 'image' || body.kind === 'voice') ? body.kind : 'text';
+    const kind = (body.kind === 'image' || body.kind === 'voice' || body.kind === 'sticker') ? body.kind : 'text';
     const iv = String(body.iv || '');
     const ct = String(body.ct || '');
     if (!iv || !ct) return fail(res, 400, '消息内容无效');

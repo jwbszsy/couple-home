@@ -807,3 +807,8 @@ body, #bg {
 .emoji-grid button { font-size: 24px; padding: 6px 0; border: 0; background: none; cursor: pointer; border-radius: 8px; font-family: inherit; }
 .emoji-grid button:active { background: var(--pink-soft); }
 #musicbar { display: none !important; }
+/* 贴纸面板与贴纸消息 */
+.sticker-grid { grid-template-columns: repeat(4, 1fr); gap: 6px; max-height: 260px; }
+.sticker-grid button { padding: 4px; }
+.sticker-grid img { width: 100%; display: block; border-radius: 10px; }
+.chat-sticker { width: 120px; height: 120px; object-fit: contain; display: block; }
