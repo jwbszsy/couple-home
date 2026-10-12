@@ -11,6 +11,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const supabaseStore = require('./lib/supabase-store');
 
 const ROOT = __dirname;
 const PUBLIC_DIR = path.join(ROOT, 'public');
@@ -33,8 +34,67 @@ try { webPush = require('web-push'); } catch (e) { /* 未安装则跳过推送 *
 
 // ---------------- 持久化 ----------------
 let db = { pairs: {} };
-try { db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8')); } catch (e) { /* 首次运行 */ }
-for (const pid of Object.keys(db.pairs || {})) normalizePair(db.pairs[pid]);
+let supabaseConfig = null;
+let supabaseReady = false;
+let snapshotWriteQueue = Promise.resolve();
+function loadLocalJson(file, fallback) {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { return fallback; }
+}
+function persistSnapshot() {
+  if (!supabaseConfig || !supabaseReady) return Promise.resolve();
+  const snapshot = JSON.parse(JSON.stringify({ db, activations, stats, vapid: VAPID }));
+  snapshotWriteQueue = snapshotWriteQueue.catch(() => {}).then(() => supabaseStore.writeSnapshot(snapshot, supabaseConfig));
+  return snapshotWriteQueue;
+}
+async function initializeStorage() {
+  if (process.env.STORAGE_BACKEND === 'supabase' && !process.env.SUPABASE_URL && !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('STORAGE_BACKEND=supabase requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY; refusing ephemeral local storage.');
+  }
+  supabaseConfig = supabaseStore.getConfig();
+  if (supabaseConfig) {
+    if (process.env.NODE_ENV === 'production' && (!process.env.ADMIN_PASS || process.env.ADMIN_PASS === 'admin888')) {
+      throw new Error('Set a strong ADMIN_PASS environment variable before production startup.');
+    }
+    const snapshot = await supabaseStore.readSnapshot(supabaseConfig);
+    if (snapshot) {
+      db = snapshot.db || { pairs: {} };
+      activations = snapshot.activations || null;
+      stats = snapshot.stats || { daily: {}, flagged: [] };
+      VAPID = snapshot.vapid || null;
+      console.log('[storage] Loaded state snapshot from Supabase');
+    } else {
+      const localDb = loadLocalJson(DB_FILE, { pairs: {} });
+      const localActivations = loadLocalJson(ACTIVATION_FILE, null);
+      const localStats = loadLocalJson(STATS_FILE, null);
+      const localVapid = loadLocalJson(VAPID_FILE, null);
+      const hasLocalState = Object.keys(localDb.pairs || {}).length > 0 ||
+        !!(localActivations && Array.isArray(localActivations.codes)) ||
+        !!(localStats && (Object.keys(localStats.daily || {}).length || (localStats.flagged || []).length)) ||
+        !!(localVapid && localVapid.publicKey);
+      if (hasLocalState) {
+        throw new Error('Supabase is empty while DATA_DIR contains existing state. Import a reviewed backup before starting; refusing to initialize over it.');
+      }
+      db = { pairs: {} };
+      activations = null;
+      stats = { daily: {}, flagged: [] };
+      VAPID = null;
+      console.log('[storage] Empty Supabase store and no local pair data; initializing a new installation');
+    }
+  } else {
+    db = loadLocalJson(DB_FILE, { pairs: {} });
+    loadLocalStats();
+    console.log('[storage] Using local JSON files');
+  }
+
+  for (const pid of Object.keys(db.pairs || {})) normalizePair(db.pairs[pid]);
+  if (!stats) stats = { daily: {}, flagged: [] };
+  if (!stats.daily) stats.daily = {};
+  if (!stats.flagged) stats.flagged = [];
+  loadActivations();
+  loadVapid();
+  supabaseReady = !!supabaseConfig;
+  if (supabaseConfig) await persistSnapshot();
+}
 
 // ---------------- 激活码 ----------------
 function genCodeByIndex(i) {
@@ -65,33 +125,37 @@ function genCodes(count, startIdx) {
 }
 let activations = null;
 function loadActivations() {
-  try { activations = JSON.parse(fs.readFileSync(ACTIVATION_FILE, 'utf8')); } catch (e) { activations = null; }
+  if (!activations && !supabaseConfig) {
+    try { activations = JSON.parse(fs.readFileSync(ACTIVATION_FILE, 'utf8')); } catch (e) { activations = null; }
+  }
   if (!activations || !Array.isArray(activations.codes)) {
     activations = { codes: genCodes(200, 0), nextIndex: 200 };
     saveActivations();
   }
 }
 function saveActivations() {
+  if (supabaseConfig) {
+    persistSnapshot().catch((e) => console.error('[supabase] save activations failed:', e.message));
+    return;
+  }
   fs.mkdirSync(DATA_DIR, { recursive: true });
   fs.writeFileSync(ACTIVATION_FILE + '.tmp', JSON.stringify(activations));
   fs.renameSync(ACTIVATION_FILE + '.tmp', ACTIVATION_FILE);
 }
-loadActivations();
 
 // ---------------- VAPID / 推送 ----------------
 let VAPID = null;
 function loadVapid() {
-  try { VAPID = JSON.parse(fs.readFileSync(VAPID_FILE, 'utf8')); } catch (e) { VAPID = null; }
+  if (!VAPID && !supabaseConfig) { try { VAPID = JSON.parse(fs.readFileSync(VAPID_FILE, 'utf8')); } catch (e) { VAPID = null; } }
   if (webPush) {
     if (!VAPID || !VAPID.publicKey) {
       VAPID = webPush.generateVAPIDKeys();
       fs.mkdirSync(DATA_DIR, { recursive: true });
-      fs.writeFileSync(VAPID_FILE, JSON.stringify(VAPID));
+      if (!supabaseConfig) fs.writeFileSync(VAPID_FILE, JSON.stringify(VAPID));
     }
     webPush.setVapidDetails('mailto:couple@localhost', VAPID.publicKey, VAPID.privateKey);
   }
 }
-loadVapid();
 
 // 管理后台会话（内存 token）
 const adminTokens = new Map();
@@ -122,21 +186,27 @@ function clientIp(req) {
 // ---------------- 使用统计（每日活跃等） ----------------
 let stats = { daily: {}, flagged: [] };
 const STATS_FILE = path.join(DATA_DIR, 'stats.json');
-try { stats = JSON.parse(fs.readFileSync(STATS_FILE, 'utf8')); } catch (e) { /* 首次运行 */ }
-if (!stats.daily) stats.daily = {};
-if (!stats.flagged) stats.flagged = [];
+function loadLocalStats() {
+  stats = loadLocalJson(STATS_FILE, { daily: {}, flagged: [] });
+  if (!stats.daily) stats.daily = {};
+  if (!stats.flagged) stats.flagged = [];
+}
 let statsSaveQueued = false;
 function saveStats() {
   if (statsSaveQueued) return;
   statsSaveQueued = true;
   setImmediate(() => {
     statsSaveQueued = false;
+    if (supabaseConfig) {
+      persistSnapshot().catch((e) => console.error('[supabase] save stats failed:', e.message));
+      return;
+    }
     try {
       fs.mkdirSync(DATA_DIR, { recursive: true });
       const tmp = STATS_FILE + '.tmp';
       fs.writeFileSync(tmp, JSON.stringify(stats));
       fs.renameSync(tmp, STATS_FILE);
-    } catch (e) { /* 忽略 */ }
+    } catch (e) { console.error('[stats] save failed:', e.message); }
   });
 }
 function todayStatsKey() {
@@ -195,6 +265,10 @@ function sendPush(targetMember, title, body) {
 
 let saveQueued = false;
 function save() {
+  if (supabaseConfig) {
+    persistSnapshot().catch((e) => console.error('[supabase] save application state failed:', e.message));
+    return;
+  }
   if (saveQueued) return;
   saveQueued = true;
   setImmediate(() => {
@@ -864,10 +938,15 @@ function serveStatic(req, res, p) {
   });
 }
 
-try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) { /* ignore */ }
-server.listen(PORT, HOST, () => {
-  console.log('❤ 我们的小屋服务已启动: http://localhost:' + PORT);
-  console.log('   数据目录: ' + DATA_DIR);
+initializeStorage().then(() => {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) { /* ignore */ }
+  server.listen(PORT, HOST, () => {
+    console.log('❤ 我们的小屋服务已启动: http://localhost:' + PORT);
+    console.log('   数据目录: ' + (supabaseConfig ? 'Supabase (persistent)' : DATA_DIR));
+  });
+}).catch((e) => {
+  console.error('[startup] storage initialization failed:', e.message);
+  process.exitCode = 1;
 });
 
 
